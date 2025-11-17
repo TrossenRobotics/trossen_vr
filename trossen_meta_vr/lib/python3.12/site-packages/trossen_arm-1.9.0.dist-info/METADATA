@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: trossen_arm
+Version: 1.9.0
+Summary: A Python wrapper for the libtrossen_arm C++ library
+Author-Email: Shiming Liang <trsupport@trossenrobotics.com>
+License-File: LICENSE
+License-File: LICENSE-3RD-PARTY.txt
+Classifier: Development Status :: 4 - Beta
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.10
+Requires-Dist: numpy>=1.22.4
+Description-Content-Type: text/markdown
+
+# Trossen Arm
+
+See the [docs](https://docs.trossenrobotics.com/trossen_arm/) for installation and usage information.
