@@ -1,1 +1,8 @@
 lib/
+lib64/
+bin/
+include/
+pyvenv/
+__pycache__/
+Trossen_meta_vr/lib64
+Trossen_meta_vr/pyvenv.cfg
