@@ -99,7 +99,7 @@ async def handler(websocket):
                 T_offset = T_robot_start @ np.linalg.inv(T_quest_start)
                 print("Teleop resumed — recalibrated controller alignment.")
 
-            # send fixed rate of commands to robot (200 Hz)
+            # Send fixed rate of commands to robot (200 Hz)
             now = time.time()
             if now - last_send_time < send_period:
                 continue
