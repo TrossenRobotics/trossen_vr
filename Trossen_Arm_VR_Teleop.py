@@ -90,7 +90,7 @@ async def handler(websocket):
             #     continue
             
             if "teleopEnabled" in data and data["teleopEnabled"]:
-                # Reset offsets and initial mapping everytime teleop is re-enabled or starts initally
+                # Reset offsets and initial mapping every time teleop is re-enabled or starts initially
                 cartesian_positions = driver.get_cartesian_positions()
                 init_robot_pose = np.array(cartesian_positions)
                 init_controller_pose = np.array(data.get("pose"), dtype=float)
