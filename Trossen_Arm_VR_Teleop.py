@@ -6,9 +6,6 @@ import websockets
 import trossen_arm
 import time
 
-# ---------------------------
-# Robot Pose Definitions
-# ---------------------------
 START_POSE = [0, np.pi/12, np.pi/12, 0, 0, 0]
 IDLE_POSE  = [0, 0, 0, 0, 0, 0]
 
@@ -27,6 +24,10 @@ driver.configure(
 driver.set_arm_modes(trossen_arm.Mode.position)
 driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
 driver.set_gripper_mode(trossen_arm.Mode.position)
+
+# Move robot to start pose on new connection
+driver.set_arm_positions(START_POSE, goal_time=3.0, blocking=True)
+print("Robot moved to START pose for teleop session.")
 
 cartesian_positions = driver.get_cartesian_positions()
 print("Initial Cartesian Positions:", cartesian_positions)
@@ -47,70 +48,74 @@ def T_to_vec6(T):
     rvec = R.from_matrix(T[:3, :3]).as_rotvec()
     return np.concatenate([p, rvec])
 
+def parse_vr_pose(pose_dict):
+    if pose_dict is None:
+        return None
+    return np.array(pose_dict["position"] + pose_dict["rotation"], dtype=float)
 
 # ---------------------------
 # Connection Handler
 # ---------------------------
 async def handler(websocket):
     print("WebSocket client connected.")
-    
-    # Move robot to start pose on new connection
-    driver.set_arm_positions(START_POSE, goal_time=3.0, blocking=True)
-    print("Robot moved to START pose for teleop session.")
 
     init_robot_pose = None
-    init_controller_pose = None
-    T_offset = None
+    init_right_pose = None
+    T_offset_right = None
+
     last_send_time = 0
     send_rate_hz = 200.0
     send_period = 1.0 / send_rate_hz
 
+    pause_telop = True
+
     try:
         async for message in websocket:
             data = json.loads(message)
+            buttons = data.get("buttons", {})
 
-            # Handle exit command (no socket close)
-            if "command" in data and data["command"] == "exit":
+            # Handle exit command
+            if buttons.get("b") == True:
                 print("Exit command received. Moving robot to IDLE pose...")
                 driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
-                print("Robot is idle. Waiting for next teleop command or reconnect.")
                 continue
-
-            # Handle pose data
-            pose = np.array(data.get("pose"), dtype=float)
-
-            # # Initialize transforms
-            # if init_controller_pose is None:
-            #     init_controller_pose = pose
-            #     init_robot_pose = np.array(cartesian_positions)
-            #     print("Captured initial controller and robot poses.")
-            #     T_robot_start = vec6_to_T(init_robot_pose)
-            #     T_quest_start = vec6_to_T(init_controller_pose)
-            #     T_offset = T_robot_start @ np.linalg.inv(T_quest_start)
-            #     continue
             
-            if "teleopEnabled" in data and data["teleopEnabled"]:
-                # Reset offsets and initial mapping every time teleop is re-enabled or starts initially
-                cartesian_positions = driver.get_cartesian_positions()
-                init_robot_pose = np.array(cartesian_positions)
-                init_controller_pose = np.array(data.get("pose"), dtype=float)
-                T_robot_start = vec6_to_T(init_robot_pose)
-                T_quest_start = vec6_to_T(init_controller_pose)
-                T_offset = T_robot_start @ np.linalg.inv(T_quest_start)
-                print("Teleop resumed — recalibrated controller alignment.")
+            if buttons.get("a") == True:
+                pause_telop = not pause_telop
 
-            # Send fixed rate of commands to robot (200 Hz)
+            if pause_telop == True:
+                if buttons.get("a") == True:
+                    print("Telop pause command received.")
+                init_right_pose = None
+                continue
+            else:
+                if buttons.get("a") == True:
+                    print("Telop resume command received.")
+
+            # Extract right controller pose
+            right_pose_vec = parse_vr_pose(data.get("right_pose"))
+
+            # Initialize transform on first teleop frame
+            if right_pose_vec is not None and init_right_pose is None:
+                cartesian_positions = driver.get_cartesian_positions()
+                init_right_pose = right_pose_vec
+                init_robot_pose = np.array(cartesian_positions)
+                T_robot_start = vec6_to_T(init_robot_pose)
+                T_right_start = vec6_to_T(init_right_pose)
+                T_offset_right = T_robot_start @ np.linalg.inv(T_right_start)
+                print("Teleop initialized — right controller alignment captured.")
+
+            # Fixed rate send
             now = time.time()
             if now - last_send_time < send_period:
                 continue
             last_send_time = now
 
-            # Apply transform from controller to robot
-            Tq = vec6_to_T(pose)
-            Tt = T_offset @ Tq
+            # Map right controller to robot
+            Tq = vec6_to_T(right_pose_vec)
+            Tt = T_offset_right @ Tq
             robot_cmd_vec = T_to_vec6(Tt)
 
-            # Send position command
             driver.set_cartesian_positions(
                 robot_cmd_vec,
                 trossen_arm.InterpolationSpace.cartesian,
@@ -119,16 +124,17 @@ async def handler(websocket):
             )
 
             # Gripper control
-            gripper_value = float(data.get("gripperValue", 0.0))
-            position = gripper_value * 0.04
-            driver.set_gripper_position(position, 0.0, False)
+            right_trigger_val = buttons.get("right_trigger", 0.0)
+            driver.set_gripper_position(right_trigger_val * 0.04, 0.0, False)
 
     except websockets.ConnectionClosed:
         print("Client disconnected — returning to IDLE pose.")
         driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
-        print("Robot returned to IDLE pose and awaiting next connection.")
+        print("Robot returned to IDLE pose.")
 
-
+# ---------------------------
+# Run WebSocket Server
+# ---------------------------
 async def main():
     async with websockets.serve(handler, "0.0.0.0", 5432, ping_interval=None):
         print("Teleop server running on ws://0.0.0.0:5432")
