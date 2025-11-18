@@ -1,7 +1,8 @@
 # Architecture
 
-## 1. VRManager  
-Manages the link to the VR application. 
+## 1. VRManager
+
+Manages the link to the VR application.
 
 Responsibilities:
 
@@ -12,27 +13,28 @@ Responsibilities:
 - API for retrieving the latest VR data.
 
 ### Conceptual Class Breakdown
+
 **Class: `VRManager`**
 - **Fields**
-  - `connection`  
-  - `is_connected`  
-  - `latest_pose`  
-  - `latest_button_actions`  
+  - `connection`
+  - `is_connected`
+  - `latest_pose`
+  - `latest_button_actions`
 
 - **Connection Functions**
-  - `start()`  
-  - `stop()`  
-  - `restart()`  
-  - `is_active()`  
+  - `start()`
+  - `stop()`
+  - `restart()`
+  - `is_active()`
 
 - **Data Functions**
-  - `get_pose()`  
-  - `send_updates(Teleop)` 
-  - `get_button_state(button_name)`  
+  - `get_pose()`
+  - `send_updates(Teleop)`
+  - `get_button_state(button_name)`
 
 ---
 
-## 2. Teleop  
+## 2. Teleop
 Defines a lightweight interface for configuring teleoperation behavior and mapping VR inputs to abstract actions the user can define.
 
 Responsibilities:
@@ -60,23 +62,23 @@ Your script (outside the SDK) plugs robot logic into these handlers.
   - `set_button_trigger(callback)`
   - `set_pose_handler(callback)`
   - `configure(...)`
-  
+
 All required handlers should be configured before use (on_start_handler, pose_handler).
 
 
 ## 3. User’s Script Layer (Robot-Specific Code)
 
-This is where the user writes their integration code.  
+This is where the user writes their integration code.
 The SDK does not know any details about the robot or the API interface the robot uses.
 
 ### Example structure (conceptual example of how we could use the above in a script)
-```python
 
+```python
 from trossen_meta_vr import VRManager, Teleop
 from my_robot_api import MyRobotDriver
 
 robot = MyRobotDriver()
-robot.connect() 
+robot.connect()
 
 vr = VRManager()
 vr.start()
@@ -110,7 +112,7 @@ t.set_pose_handler(handle_pose)
 while True:
     vr_pose = vr.get_pose()
     buttons = vr.latest_button_actions
-    
+
     robot.pose_handler(vr_pose)
 
     if t.evaluate_button_states(buttons):
