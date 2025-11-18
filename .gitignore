@@ -1,7 +1,6 @@
 lib/
 lib64/
 bin/
-include/
 pyvenv/
 __pycache__/
 Trossen_meta_vr/lib64
