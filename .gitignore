@@ -5,3 +5,5 @@ lib64/
 bin/
 pyvenv/
 __pycache__/
+.cache/
+cmake/

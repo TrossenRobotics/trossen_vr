@@ -9,9 +9,7 @@ import time
 START_POSE = [0, np.pi/12, np.pi/12, 0, 0, 0]
 IDLE_POSE  = [0, 0, 0, 0, 0, 0]
 
-# ---------------------------
 # Driver Setup
-# ---------------------------
 driver = trossen_arm.TrossenArmDriver()
 
 print("Configuring drivers...")
@@ -32,9 +30,7 @@ print("Robot moved to START pose for teleop session.")
 cartesian_positions = driver.get_cartesian_positions()
 print("Initial Cartesian Positions:", cartesian_positions)
 
-# ---------------------------
 # Helper Functions
-# ---------------------------
 def vec6_to_T(v6):
     p = np.asarray(v6[:3], dtype=float)
     rvec = np.asarray(v6[3:], dtype=float)
@@ -53,9 +49,7 @@ def parse_vr_pose(pose_dict):
         return None
     return np.array(pose_dict["position"] + pose_dict["rotation"], dtype=float)
 
-# ---------------------------
 # Connection Handler
-# ---------------------------
 async def handler(websocket):
     print("WebSocket client connected.")
 
@@ -132,9 +126,7 @@ async def handler(websocket):
         driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
         print("Robot returned to IDLE pose.")
 
-# ---------------------------
 # Run WebSocket Server
-# ---------------------------
 async def main():
     async with websockets.serve(handler, "0.0.0.0", 5432, ping_interval=None):
         print("Teleop server running on ws://0.0.0.0:5432")
