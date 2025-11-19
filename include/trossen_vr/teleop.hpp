@@ -184,7 +184,7 @@ public:
   *
   * @return Optional containing the pending message, or empty if none.
   */
-  std::optional<std::string> get_pending_update() {
+  std::optional<std::string> get_pending_update() const {
     std::lock_guard<std::mutex> lock(outbound_mutex_);
     return pending_update_;
   }
