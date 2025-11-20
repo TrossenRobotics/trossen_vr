@@ -35,6 +35,8 @@ message(STATUS "Building ${PROJECT_NAME} for ${OS}/${ARCH}")
 
 file(GLOB_RECURSE HEADER_FILES ${PROJECT_SOURCE_DIR}/include/trossen_vr/*.hpp)
 file(GLOB_RECURSE SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/trossen_vr/*.cpp)
+file(GLOB_RECURSE TEST_FILES ${PROJECT_SOURCE_DIR}/scripts/cpp/*.cpp)
+
 
 add_library(${LIBRARY_NAME} STATIC
     ${SOURCE_FILES}
@@ -58,16 +60,23 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC nlohmann_json::nlohmann_json)
 find_package(websocketpp REQUIRED)
 target_link_libraries(${LIBRARY_NAME} PUBLIC websocketpp::websocketpp)
 
+# Find the libtrossen_arm package
+find_package(libtrossen_arm REQUIRED)
+target_link_libraries(${LIBRARY_NAME} PRIVATE libtrossen_arm)
+
 if(BUILD_DEMOS)
     add_executable(vr_demo examples/main.cpp)
     target_include_directories(vr_demo PUBLIC ${PROJECT_SOURCE_DIR}/include)
     target_link_libraries(vr_demo PRIVATE ${LIBRARY_NAME})
 endif()
 
+add_executable(teleop scripts/cpp/test_script1.cpp)
+target_link_libraries(teleop PRIVATE ${LIBRARY_NAME} libtrossen_arm)
+
+
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
         DESTINATION include)
 
 install(TARGETS ${LIBRARY_NAME}
         ARCHIVE DESTINATION lib)
-
 

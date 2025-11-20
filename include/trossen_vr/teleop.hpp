@@ -160,7 +160,7 @@ public:
   *
   * @param pose Pose data from the VR system.
   */
-  void handle_pose(const VRPose& pose) const;
+  void handle_pose(const VRPose& pose, const std::string& controller) const;
 
   /**
   * @brief Evaluate button states and dispatch handlers.
@@ -206,7 +206,7 @@ protected:
   *
   * @param flags Bitmask encoding configuration options.
   */
-  virtual void on_configure(std::uint32_t flags) = 0;
+  virtual void on_configure(std::uint32_t flags) {};
 
   /**
   * @brief Post a serialized update to the outbound message buffer.
