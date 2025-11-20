@@ -4,7 +4,6 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -16,50 +15,6 @@
 namespace trossen_vr {
 
 class Teleop;
-
-/**
- * @class IWebsocketClient
- * @brief Interface abstraction for WebSocket transport used by VRManager.
- *
- * This interface allows VRManager to operate with any WebSocket backend.
- * Implementations must provide connection management, message sending,
- * and timed frame reception.
- */
-class IWebsocketClient {
-public:
-    virtual ~IWebsocketClient() = default;
-
-    /**
-     * @brief Establish the WebSocket connection.
-     */
-    virtual void connect() = 0;
-
-    /**
-     * @brief Close the WebSocket connection.
-     */
-    virtual void disconnect() = 0;
-
-    /**
-     * @brief Check whether the client is currently connected.
-     * @return true if connected, false otherwise.
-     */
-    virtual bool is_connected() const = 0;
-
-    /**
-     * @brief Read a VR input frame with timeout.
-     *
-     * @param timeout Maximum duration to block for a frame.
-     * @return A frame if received, or std::nullopt if timeout or no data.
-     */
-    virtual std::optional<VRState> read_frame(std::chrono::milliseconds timeout) = 0;
-
-    /**
-     * @brief Send a payload string over the WebSocket connection.
-     *
-     * @param payload Serialized data to transmit.
-     */
-    virtual void send(const std::string& payload) = 0;
-};
 
 /**
  * @class VRManager
@@ -87,13 +42,10 @@ public:
      * read_timeout: Max duration to block waiting for a VR frame.
      */
     struct Config {
-        uint16_t server_port = 5432; 
+        uint16_t server_port {}; 
         std::chrono::milliseconds reconnect_delay{1000};
         std::chrono::milliseconds read_timeout{50};
     };
-
-    // Factory type for supplying custom WebSocket client implementations.
-    using Client = std::function<std::unique_ptr<IWebsocketClient>(const Config&)>;
 
     /**
      * @brief Construct VRManager using the default WebSocket client implementation (server-mode).
@@ -101,14 +53,6 @@ public:
      * @param config Connection and operating parameters.
      */
     explicit VRManager(Config config);
-
-    /**
-     * @brief Construct VRManager with a user-provided WebSocket client factory.
-     *
-     * @param config VR manager configuration.
-     * @param client Custom client factory.
-     */
-    VRManager(Config config, Client client);
 
     /**
      * @brief Destructor shuts down I/O thread and cleans up resources.
@@ -165,14 +109,24 @@ public:
     std::optional<VRState> get_latest_frame() const;
 
     /**
-     * @brief Poll the Teleop instance for outbound messages to send to VR.
+     * @brief Poll the Teleop instance for messages to send to robot.
      *
-     * If Teleop has posted an update, VRManager will transmit it using the
-     * WebSocket client. Called regularly inside the I/O loop.
+     * If Teleop has posted an update, VRManager will transmit it to the robot. 
+     * Called regularly inside the I/O loop.
      *
      * @param teleop Teleop instance being polled.
      */  
     void poll_teleop(Teleop& teleop);
+
+
+    /**
+     * @brief Poll the the vr_manager for a vrstate frame manually (without starting the io thread).
+     *
+     * 
+     *
+     * @param manual Indicates manual polling mode.
+     */  
+    std::optional<VRState> get_current_state();
 
 private:
     /**
@@ -181,7 +135,6 @@ private:
      * Handles reconnection logic, frame reading, and outbound Teleop updates.
      */
     void run();
-
     /**
      * @brief Process a newly received VR input frame.
      *
@@ -209,16 +162,16 @@ private:
      * @param config VR manager configuration.
      * @return A fully constructed WebSocket server client.
      */
-    static std::unique_ptr<IWebsocketClient> create_default_client(const Config& config);
+    static std::unique_ptr<void, void(*)(void*)> create_default_client(const Config& config);
 
     Config config_;
-    std::unique_ptr<IWebsocketClient> client_connection_;
-    Client client_;
+    std::unique_ptr<void, void(*)(void*)> client_connection_;
     mutable std::mutex client_mutex_;
 
     std::thread io_thread_;
     mutable std::mutex lifecycle_mutex_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> manual_mode_{false};
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> connected_{false};
 

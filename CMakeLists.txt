@@ -73,6 +73,9 @@ endif()
 add_executable(teleop scripts/cpp/test_script1.cpp)
 target_link_libraries(teleop PRIVATE ${LIBRARY_NAME} libtrossen_arm)
 
+add_executable(teleop2 scripts/cpp/test_script2.cpp)
+target_link_libraries(teleop2 PRIVATE ${LIBRARY_NAME} libtrossen_arm)
+
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
         DESTINATION include)
