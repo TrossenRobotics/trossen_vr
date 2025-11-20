@@ -10,6 +10,8 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <queue>
+
 
 #include "trossen_vr/vr_types.hpp"
 
@@ -165,14 +167,24 @@ public:
     std::optional<VRState> get_latest_frame() const;
 
     /**
-     * @brief Poll the Teleop instance for outbound messages to send to VR.
+     * @brief Poll the Teleop instance for messages to send to robot.
      *
-     * If Teleop has posted an update, VRManager will transmit it using the
-     * WebSocket client. Called regularly inside the I/O loop.
+     * If Teleop has posted an update, VRManager will transmit it to the robot. 
+     * Called regularly inside the I/O loop.
      *
      * @param teleop Teleop instance being polled.
      */  
     void poll_teleop(Teleop& teleop);
+
+
+    /**
+     * @brief Poll the the vr_manager for a vrstate frame manually (without starting the io thread).
+     *
+     * 
+     *
+     * @param manual Indicates manual polling mode.
+     */  
+    std::optional<VRState> poll_manual();
 
 private:
     /**
@@ -181,7 +193,6 @@ private:
      * Handles reconnection logic, frame reading, and outbound Teleop updates.
      */
     void run();
-
     /**
      * @brief Process a newly received VR input frame.
      *
@@ -219,6 +230,7 @@ private:
     std::thread io_thread_;
     mutable std::mutex lifecycle_mutex_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> manual_mode_{false};
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> connected_{false};
 

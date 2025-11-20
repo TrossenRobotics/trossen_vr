@@ -178,6 +178,7 @@ void VRManager::start() {
     }
 }
 
+
 void VRManager::stop() {
     std::lock_guard<std::mutex> lock(lifecycle_mutex_);
     stop_requested_ = true;
@@ -222,6 +223,13 @@ void VRManager::poll_teleop(Teleop& teleop) {
 
     // Handle buttons
     teleop.evaluate_button_states(frame_opt->buttons);
+}
+
+std::optional<VRState> VRManager::poll_manual() {
+    auto frame_opt = get_latest_frame();
+
+    return frame_opt;
+
 }
 
 
