@@ -16,7 +16,6 @@ void Teleop::set_resume_handler(ActionHandler handler) { on_resume_ = std::move(
 // Pose Handlers
 void Teleop::set_left_pose_handler(PoseHandler handler) { left_pose_handler_ = std::move(handler); }
 void Teleop::set_right_pose_handler(PoseHandler handler) { right_pose_handler_ = std::move(handler); }
-void Teleop::set_pose_handler(PoseHandler handler) { pose_handler_ = std::move(handler); }
 
 // Exit condition
 void Teleop::set_exit_condition(ExitPredicate predicate) { exit_predicate_ = std::move(predicate); }
@@ -40,8 +39,6 @@ void Teleop::notify_resume() { if(on_resume_) on_resume_(); }
 void Teleop::handle_pose(const VRPose& pose, const std::string& controller) const {
     if (controller == "left" && left_pose_handler_) left_pose_handler_(pose);
     else if (controller == "right" && right_pose_handler_) right_pose_handler_(pose);
-
-    if (pose_handler_) pose_handler_(pose); // optional general handler
 }
 
 

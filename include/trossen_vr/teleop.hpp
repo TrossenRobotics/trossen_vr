@@ -98,12 +98,6 @@ public:
   void set_right_pose_handler(PoseHandler handler);
 
   /**
-   * @brief Set a callback invoked for all pose updates (left or right).
-   * @param handler Function receiving every VRPose update.
-   */
-  void set_pose_handler(PoseHandler handler);
-
-  /**
    * @brief Set user-defined exit condition predicate.
    * @param predicate Function evaluating button map and returning true
    *                  if teleoperation should terminate.
@@ -233,7 +227,6 @@ private:
   std::unordered_map<std::string, bool> previous_button_states_;
   PoseHandler left_pose_handler_;
   PoseHandler right_pose_handler_;
-  PoseHandler pose_handler_;
   ActionHandler on_start_;
   ActionHandler on_pause_;
   ActionHandler on_resume_;
