@@ -53,17 +53,41 @@ public:
    */
   void set_button_B_handler(ActionHandler handler);
 
+    /**
+   * @brief Register a callback for the X button.
+   * @param handler Function to invoke upon rising edge of the X button.
+   */
+  void set_button_X_handler(ActionHandler handler);
+
+  /**
+   * @brief Register a callback for the Y button.
+   * @param handler Function to invoke upon rising edge of the Y button.
+   */
+  void set_button_Y_handler(ActionHandler handler);
+
   /**
    * @brief Register a callback for the trigger button.
    * @param handler Function to invoke when the trigger is pressed.
    */
-  void set_button_trigger_handler(ActionHandler handler);
+  void set_button_right_trigger_handler(ActionHandler handler);
 
   /**
    * @brief Register a callback for the grip button.
    * @param handler Function to invoke when the grip button is pressed.
    */
-  void set_button_grip_handler(ActionHandler handler);
+  void set_button_right_grip_handler(ActionHandler handler);
+
+    /**
+   * @brief Register a callback for the trigger button.
+   * @param handler Function to invoke when the trigger is pressed.
+   */
+  void set_button_left_trigger_handler(ActionHandler handler);
+
+  /**
+   * @brief Register a callback for the grip button.
+   * @param handler Function to invoke when the grip button is pressed.
+   */
+  void set_button_left_grip_handler(ActionHandler handler);
 
 
   /**
@@ -225,6 +249,7 @@ protected:
 private:
   std::unordered_map<std::string, ActionHandler> button_handlers_;
   std::unordered_map<std::string, bool> previous_button_states_;
+  std::unordered_map<std::string, double> previous_analog_states_;
   PoseHandler left_pose_handler_;
   PoseHandler right_pose_handler_;
   ActionHandler on_start_;

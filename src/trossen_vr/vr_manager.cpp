@@ -43,6 +43,8 @@ public:
             s_.set_message_handler([this](websocketpp::connection_hdl, websocketpp::server<websocketpp::config::asio>::message_ptr msg) {
                 std::lock_guard<std::mutex> lock(msg_mutex_);
                 last_message_ = msg->get_payload();
+
+
             });
 
             websocketpp::lib::error_code ec;
@@ -112,6 +114,7 @@ public:
 
                     frame.timestamp = std::chrono::steady_clock::now();
                     frame.sequence = j.value("sequence", ++sequence_);
+
                     return frame;
                 } catch (const std::exception& e) {
                     std::cerr << "[VRManager] JSON parse error: " << e.what() << "\n";

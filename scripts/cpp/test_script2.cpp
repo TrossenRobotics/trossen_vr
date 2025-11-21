@@ -94,10 +94,28 @@ int main() {
     // ---------------------------
     // State for teleop alignment
     // ---------------------------
-    bool pause_teleop = true;
+    bool pause_teleop = false;
     std::optional<std::array<double,6>> init_right_pose;
     std::optional<std::array<double,6>> init_robot_pose;
     Eigen::Matrix4d T_offset_right = Eigen::Matrix4d::Identity();
+
+
+
+    // -------------------------------------
+    // BUTTON HANDLING HELPER 
+    // -------------------------------------
+    // handles rising edge detection for buttons 
+    std::unordered_map<std::string, bool> prev_buttons;
+    auto button_pressed = [&](const VRState& st, const std::string& name) {
+        auto it = st.buttons.find(name);
+        if (it == st.buttons.end()) return false;
+        if (!std::holds_alternative<bool>(it->second)) return false;
+
+        bool current = std::get<bool>(it->second);
+        bool previous = prev_buttons[name];
+        prev_buttons[name] = current;
+        return (!previous && current);  // rising edge
+    };
 
 
 
@@ -118,27 +136,21 @@ int main() {
         // -------------------------------------
         // BUTTON HANDLING
         // -------------------------------------
+        // Track previous button states (bool-type buttons only)
         // Toggle pause/resume on A
-        {
-            auto it = frame.buttons.find("a");
-            if (it != frame.buttons.end() && std::holds_alternative<bool>(it->second)) {
-                if (std::get<bool>(it->second)) {
-                    pause_teleop = !pause_teleop;
-                    std::cout << (pause_teleop ? "Teleop PAUSED\n" : "Teleop RESUMED\n");
-                }
-            }
+        if (button_pressed(frame, "a")) {
+            pause_teleop = !pause_teleop;
+            std::cout << (pause_teleop ? "Teleop PAUSED\n" : "Teleop RESUMED\n");
         }
 
+
         // B returns robot to idle pose
-        {
-            auto it = frame.buttons.find("b");
-            if (it != frame.buttons.end() && std::holds_alternative<bool>(it->second)) {
-                if (std::get<bool>(it->second)) {
-                    std::cout << "Returning to IDLE pose.\n";
-                    driver.set_arm_positions(IDLE_POSE, 3.0, true);
-                }
-            }
+        if (button_pressed(frame, "b")) {
+            std::cout << "Returning to IDLE pose.\n";
+            driver.set_arm_positions(IDLE_POSE, 3.0, true);
+            break;
         }
+
 
 
 

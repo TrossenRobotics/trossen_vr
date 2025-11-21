@@ -10,8 +10,6 @@
 #include <optional>
 #include <string>
 #include <thread>
-#include <queue>
-
 
 #include "trossen_vr/vr_types.hpp"
 

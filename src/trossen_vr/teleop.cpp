@@ -5,9 +5,12 @@ namespace trossen_vr {
 // Button Handlers
 void Teleop::set_button_A_handler(ActionHandler handler) { register_button_handler("a", std::move(handler)); }
 void Teleop::set_button_B_handler(ActionHandler handler) { register_button_handler("b", std::move(handler)); }
-void Teleop::set_button_trigger_handler(ActionHandler handler) { register_button_handler("trigger", std::move(handler)); }
-void Teleop::set_button_grip_handler(ActionHandler handler) { register_button_handler("grip", std::move(handler)); }
-
+void Teleop::set_button_X_handler(ActionHandler handler) { register_button_handler("x", std::move(handler)); }
+void Teleop::set_button_Y_handler(ActionHandler handler) { register_button_handler("y", std::move(handler)); }
+void Teleop::set_button_right_trigger_handler(ActionHandler handler) { register_button_handler("right_trigger", std::move(handler)); }
+void Teleop::set_button_right_grip_handler(ActionHandler handler) { register_button_handler("right_grip", std::move(handler)); }
+void Teleop::set_button_left_trigger_handler(ActionHandler handler) { register_button_handler("left_trigger", std::move(handler)); }
+void Teleop::set_button_left_grip_handler(ActionHandler handler) { register_button_handler("left_grip", std::move(handler)); }
 // Start / Pause / Resume Handlers
 void Teleop::set_start_handler(ActionHandler handler) { on_start_ = std::move(handler); }
 void Teleop::set_pause_handler(ActionHandler handler) { on_pause_ = std::move(handler); }
@@ -44,20 +47,39 @@ void Teleop::handle_pose(const VRPose& pose, const std::string& controller) cons
 
 bool Teleop::evaluate_button_states(const std::unordered_map<std::string, VRButtonValue>& buttons) {
     bool exit = false;
+
     for (const auto& [name, handler] : button_handlers_) {
         auto it = buttons.find(name);
-        if (it != buttons.end()) {
-            bool pressed = false;
-            if (std::holds_alternative<bool>(it->second)) pressed = std::get<bool>(it->second);
+        if (it == buttons.end()) 
+            continue;
+
+        const auto& value = it->second;
+
+        // --- Boolean buttons (A, B, X, Y)
+        if (std::holds_alternative<bool>(value)) {
+            bool pressed = std::get<bool>(value);
             bool last = previous_button_states_[name];
-            if (pressed && !last) handler();
+
+            if (pressed && !last)
+                handler();
+
             previous_button_states_[name] = pressed;
+        }
+
+        // --- Analog buttons (triggers, thumbsticks-as-buttons)
+        else if (std::holds_alternative<double>(value)) {
+            handler();
+
+            previous_analog_states_[name] = std::get<double>(value);
         }
     }
 
-    if(exit_predicate_) exit = exit_predicate_(buttons);
+    if (exit_predicate_)
+        exit = exit_predicate_(buttons);
+
     return exit;
 }
+
 
 void Teleop::register_button_handler(const std::string& button, ActionHandler handler) {
     button_handlers_[button] = std::move(handler);
