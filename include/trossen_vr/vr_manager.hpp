@@ -23,15 +23,14 @@ class Teleop;
  *
  * This interface allows VRManager to operate with any WebSocket backend.
  * Implementations must provide connection management, message sending,
- * and timed frame reception. It now supports server-mode operation, 
- * where VRManager listens for an incoming connection from a VR rig.
+ * and timed frame reception.
  */
 class IWebsocketClient {
 public:
     virtual ~IWebsocketClient() = default;
 
     /**
-     * @brief Establish the WebSocket connection or start listening (server mode).
+     * @brief Establish the WebSocket connection.
      */
     virtual void connect() = 0;
 
@@ -64,12 +63,13 @@ public:
 
 /**
  * @class VRManager
- * @brief Manages VR device communication and state synchronization over WebSocket.
+ * @brief Manages VR device communication and state synchronization over WebSocket connection.
  *
- * VRManager handles the lifecycle of a WebSocket-based VR input system.
- * It now operates as a **server**, listening for incoming connections
- * from a VR rig, receiving controller pose and button data, and sending
- * outbound Teleop updates.
+ * VRManager handles the lifecycle of a WebSocket-based VR input system, managing
+ * connection state, receiving VR input frames (pose and button data), and polling
+ * the Teleop for outbound updates to send back to the VR rig. It runs a dedicated
+ * I/O thread for asynchronous communication and provides thread-safe access to
+ * the latest VR state.
  *
  * Thread-safety:
  * - All public methods are thread-safe
