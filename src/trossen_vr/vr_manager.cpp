@@ -104,6 +104,7 @@ std::optional<VRState> WebsocketServerClient::read_frame(std::chrono::millisecon
 
                     frame.timestamp = std::chrono::steady_clock::now();
                     frame.sequence = j.value("sequence", ++sequence_);
+
                     return frame;
                 } catch (const std::exception& e) {
                     std::cerr << "[VRManager] JSON parse error: " << e.what() << "\n";
