@@ -83,14 +83,14 @@ def handle_right_pose(pose):
     )
 
 def handle_button_a():
-    global pause_telop
-    pause_telop = not pause_telop
-    print(f"Teleop {'paused' if pause_telop else 'resumed'}")
+    global pause_teleop
+    pause_teleop = not pause_teleop
+    print(f"Teleop {'paused' if pause_teleop else 'resumed'}")
 
 def handle_button_b():
     driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
-    global pause_telop
-    pause_telop = not pause_telop
+    global pause_teleop
+    pause_teleop = not pause_teleop
 
 def handle_right_trigger():
     # Get the analog trigger value from VRManager

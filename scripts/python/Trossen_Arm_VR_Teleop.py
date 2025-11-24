@@ -61,7 +61,7 @@ async def handler(websocket):
     send_rate_hz = 200.0
     send_period = 1.0 / send_rate_hz
 
-    pause_telop = True
+    pause_teleop = True
 
     try:
         async for message in websocket:
@@ -75,16 +75,16 @@ async def handler(websocket):
                 continue
             
             if buttons.get("a") == True:
-                pause_telop = not pause_telop
+                pause_teleop = not pause_teleop
 
-            if pause_telop == True:
+            if pause_teleop == True:
                 if buttons.get("a") == True:
-                    print("Telop pause command received.")
+                    print("Teleop pause command received.")
                 init_right_pose = None
                 continue
             else:
                 if buttons.get("a") == True:
-                    print("Telop resume command received.")
+                    print("Teleop resume command received.")
 
             # Extract right controller pose
             right_pose_vec = parse_vr_pose(data.get("right_pose"))
