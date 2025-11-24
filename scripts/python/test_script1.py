@@ -46,15 +46,15 @@ vr_manager.start()
 print("VRManager started, connecting to VR client.")
 
 # Teleop callbacks
-pause_telop = True
+pause_teleop = True
 init_right_pose = None
 T_offset_right = None
 init_robot_pose = None
 
 def handle_right_pose(pose):
-    global pause_telop, init_right_pose, T_offset_right, init_robot_pose
+    global pause_teleop, init_right_pose, T_offset_right, init_robot_pose
     
-    if pause_telop:
+    if pause_teleop:
         return
     
     right_pose_vec = parse_vr_pose(pose)
