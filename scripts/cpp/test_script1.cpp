@@ -109,10 +109,6 @@ int main() {
         Eigen::Matrix4d Tq = vec6_to_T(right_pose_vec);
         Eigen::Matrix4d Tt = T_offset_right * Tq;
         auto robot_cmd = T_to_vec6(Tt);
-        
-        // std::cout << "Sending robot command: ";
-        // for (auto v : robot_cmd) std::cout << v << " ";
-        // std::cout << std::endl;
 
         driver.set_cartesian_positions(robot_cmd,
                                        trossen_arm::InterpolationSpace::cartesian,
@@ -141,7 +137,6 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 
-    // Cleanup (won't usually be reached)
     driver.set_arm_positions(IDLE_POSE, 3.0, true);
     return 0;
 }

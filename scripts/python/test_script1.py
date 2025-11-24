@@ -1,7 +1,7 @@
 import asyncio
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-import trossen_vr 
+import pytrossen_vr
 import trossen_arm
 
 START_POSE = [0, np.pi/12, np.pi/12, 0, 0, 0]
@@ -39,9 +39,9 @@ def parse_vr_pose(pose):
     return np.array(pose.position + pose.rotation, dtype=float)
 
 # VRManager Setup
-vr_config = trossen_vr.VRManager.Config()
-vr_config.endpoint_uri = "ws://0.0.0.0:5432" 
-vr_manager = trossen_vr.VRManager(vr_config)
+vr_config = pytrossen_vr.VRManagerConfig()
+vr_config.server_port = 5432
+vr_manager = pytrossen_vr.VRManager(vr_config)
 vr_manager.start()
 print("VRManager started, connecting to VR client.")
 
@@ -51,22 +51,13 @@ init_right_pose = None
 T_offset_right = None
 init_robot_pose = None
 
-def teleop_callback(frame):
+def handle_right_pose(pose):
     global pause_telop, init_right_pose, T_offset_right, init_robot_pose
-
-    # Handle buttons
-    buttons = frame.buttons
-    if "b" in buttons and buttons["b"]:
-        driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
-        return
-
-    if "a" in buttons and buttons["a"]:
-        pause_telop = not pause_telop
-
+    
     if pause_telop:
         return
-
-    right_pose_vec = parse_vr_pose(frame.right_pose)
+    
+    right_pose_vec = parse_vr_pose(pose)
     if right_pose_vec is None:
         return
 
@@ -91,22 +82,38 @@ def teleop_callback(frame):
         blocking=False
     )
 
-    # Gripper control
-    right_trigger_val = buttons.get("right_trigger", 0.0)
-    driver.set_gripper_position(right_trigger_val * 0.04, 0.0, False)
+def handle_button_a():
+    global pause_telop
+    pause_telop = not pause_telop
+    print(f"Teleop {'paused' if pause_telop else 'resumed'}")
 
-# Bind the callback to VRManager
-teleop = trossen_vr.Teleop()
-teleop.set_right_pose_handler(teleop_callback)
+def handle_button_b():
+    driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
+    global pause_telop
+    pause_telop = not pause_telop
+
+def handle_right_trigger():
+    # Get the analog trigger value from VRManager
+    trigger_val = vr_manager.get_button_state("right_trigger")
+    if trigger_val is not None:
+        if isinstance(trigger_val, float):
+            driver.set_gripper_position(trigger_val * 0.04, 0.0, False)
+
+# Bind the callbacks
+teleop = pytrossen_vr.Teleop()
+teleop.set_right_pose_handler(handle_right_pose)
+teleop.set_button_A_handler(handle_button_a)
+teleop.set_button_B_handler(handle_button_b)
+teleop.set_button_right_trigger_handler(handle_right_trigger)
 
 # Polling loop
 async def main_loop():
-    try:
-        while True:
-            vr_manager.poll_teleop(teleop)
-            await asyncio.sleep(0.005)  # ~200 Hz loop
-    finally:
-        driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
-        print("Teleop ended — robot returned to IDLE pose.")
+
+    while True:
+        vr_manager.poll_teleop(teleop)
+        await asyncio.sleep(0.005)  # ~200 Hz loop
+    # finally:
+    #     driver.set_arm_positions(IDLE_POSE, goal_time=3.0, blocking=True)
+    #     print("Teleop ended — robot returned to IDLE pose.")
 
 asyncio.run(main_loop())

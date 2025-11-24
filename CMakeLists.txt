@@ -35,8 +35,12 @@ message(STATUS "Building ${PROJECT_NAME} for ${OS}/${ARCH}")
 
 file(GLOB_RECURSE HEADER_FILES ${PROJECT_SOURCE_DIR}/include/trossen_vr/*.hpp)
 file(GLOB_RECURSE SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/trossen_vr/*.cpp)
+# Exclude bindings.cpp from the static library
+list(FILTER SOURCE_FILES EXCLUDE REGEX ".*bindings\\.cpp$")
 file(GLOB_RECURSE TEST_FILES ${PROJECT_SOURCE_DIR}/scripts/cpp/*.cpp)
 
+# Set Position Independent Code flag before defining targets
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(${LIBRARY_NAME} STATIC
     ${SOURCE_FILES}
@@ -63,6 +67,13 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC websocketpp::websocketpp)
 # Find the libtrossen_arm package
 find_package(libtrossen_arm REQUIRED)
 target_link_libraries(${LIBRARY_NAME} PRIVATE libtrossen_arm)
+
+# Find pybind11
+find_package(pybind11 CONFIG REQUIRED)
+# Find Python with development headers
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+pybind11_add_module(pytrossen_vr MODULE src/trossen_vr/bindings.cpp)
+target_link_libraries(pytrossen_vr PRIVATE ${LIBRARY_NAME} libtrossen_arm Python::Python)
 
 if(BUILD_DEMOS)
     add_executable(vr_demo examples/main.cpp)
