@@ -8,70 +8,62 @@
 #include <atomic>
 
 #include <nlohmann/json.hpp>
-#include <websocketpp/config/asio_no_tls.hpp> 
-#include <websocketpp/server.hpp>
-
 
 using json = nlohmann::json;
 
 namespace trossen_vr {
 
-class WebsocketServerClient : public IWebsocketClient {
-public:
-    explicit WebsocketServerClient(const VRManager::Config& config)
-        : port_(config.server_port), connected_(false), sequence_(0) {}
+// WebsocketServerClient implementations
 
+WebsocketServerClient::WebsocketServerClient(uint16_t port)
+    : port_(port), connected_(false), sequence_(0) {}
 
-    void connect() override {
-        try {
-            s_.init_asio();
+void WebsocketServerClient::connect() {
+        s_.init_asio();
 
-            s_.set_open_handler([this](websocketpp::connection_hdl hdl) {
-                std::lock_guard<std::mutex> lock(conn_mutex_);
-                connection_ = hdl;
-                connected_ = true;
-                std::cout << "[VRManager] VR rig connected\n";
-            });
+        s_.set_open_handler([this](websocketpp::connection_hdl hdl) {
+            std::lock_guard<std::mutex> lock(conn_mutex_);
+            connection_ = hdl;
+            connected_ = true;
+            std::cout << "[VRManager] VR rig connected\n";
+        });
 
-            s_.set_close_handler([this](websocketpp::connection_hdl) {
-                std::lock_guard<std::mutex> lock(conn_mutex_);
-                connected_ = false;
-                connection_.reset();
-                std::cout << "[VRManager] VR rig disconnected\n";
-            });
+        s_.set_close_handler([this](websocketpp::connection_hdl) {
+            std::lock_guard<std::mutex> lock(conn_mutex_);
+            connected_ = false;
+            connection_.reset();
+            std::cout << "[VRManager] VR rig disconnected\n";
+        });
 
-            s_.set_message_handler([this](websocketpp::connection_hdl, websocketpp::server<websocketpp::config::asio>::message_ptr msg) {
-                std::lock_guard<std::mutex> lock(msg_mutex_);
-                last_message_ = msg->get_payload();
-            });
+        s_.set_message_handler([this](websocketpp::connection_hdl, websocketpp::server<websocketpp::config::asio>::message_ptr msg) {
+            std::lock_guard<std::mutex> lock(msg_mutex_);
+            last_message_ = msg->get_payload();
+        });
 
-            websocketpp::lib::error_code ec;
-            s_.listen(port_, ec);
-            if (ec) {
-                std::cerr << "[VRManager] Failed to listen on port " << port_ << ": " << ec.message() << "\n";
-                return;
-            }
-
-            s_.start_accept();
-            thread_ = std::thread([this]() { s_.run(); });
-
-            std::cout << "[VRManager] Server listening on port " << port_ << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "[VRManager] WebSocket server exception: " << e.what() << "\n";
+        websocketpp::lib::error_code ec;
+        s_.listen(port_, ec);
+        if (ec) {
+            std::cerr << "[VRManager] Failed to listen on port " << port_ << ": " << ec.message() << "\n";
+            throw std::runtime_error("Failed to listen on port " + std::to_string(port_) + ": " + ec.message());
         }
+
+        s_.start_accept();
+        thread_ = std::thread([this]() { s_.run(); });
+
+        std::cout << "[VRManager] Server listening on port " << port_ << "\n";
     }
 
-    void disconnect() override {
+void WebsocketServerClient::disconnect() {
         s_.stop();
         if (thread_.joinable()) thread_.join();
         connected_ = false;
     }
 
-    bool is_connected() const override {
+bool WebsocketServerClient::is_connected() const {
         return connected_;
     }
 
-    std::optional<VRState> read_frame(std::chrono::milliseconds timeout) override {
+std::optional<VRState> WebsocketServerClient::read_frame(std::chrono::milliseconds timeout) {
         auto start = std::chrono::steady_clock::now();
         while ((std::chrono::steady_clock::now() - start) < timeout) {
             std::string msg;
@@ -123,8 +115,7 @@ public:
         return std::nullopt;
     }
 
-
-    void send(const std::string& payload) override {
+void WebsocketServerClient::send(const std::string& payload) {
         std::lock_guard<std::mutex> lock(conn_mutex_);
         if (connected_ && connection_.lock()) {
             websocketpp::lib::error_code ec;
@@ -133,36 +124,20 @@ public:
         }
     }
 
-private:
-    uint16_t port_;
-    websocketpp::server<websocketpp::config::asio> s_;
-    std::weak_ptr<void> connection_;
-    mutable std::mutex conn_mutex_;
-    mutable std::mutex msg_mutex_;
-    std::string last_message_;
-    std::atomic<bool> connected_;
-    std::thread thread_;
-    uint64_t sequence_;
-
-    uint16_t extract_port(const std::string& uri) {
+uint16_t WebsocketServerClient::extract_port(const std::string& uri) {
         // Parse "ws://0.0.0.0:5432" → 5432
         auto colon_pos = uri.find_last_of(':');
         if (colon_pos == std::string::npos) return 5432;
         return static_cast<uint16_t>(std::stoi(uri.substr(colon_pos + 1)));
     }
-};
 
-
+// VRManager implementations
 
 VRManager::VRManager(Config config)
-    : config_(config) {
-    client_ = [this](const Config& cfg) { return create_default_client(cfg); };
-    ensure_client();
-}
-
-VRManager::VRManager(Config config, Client client)
-    : config_(config), client_(client) {
-    ensure_client();
+    : config_(config),
+      client_connection_(std::make_unique<WebsocketServerClient>(config.server_port)) {
+    client_connection_->connect();
+    connected_ = client_connection_->is_connected();
 }
 
 VRManager::~VRManager() {
@@ -224,18 +199,20 @@ void VRManager::poll_teleop(Teleop& teleop) {
     teleop.evaluate_button_states(frame_opt->buttons);
 }
 
+std::optional<VRState> VRManager::get_current_state() {
+    auto frame_opt = get_latest_frame();
+
+    return frame_opt;
+
+}
 
 void VRManager::ensure_client() {
     std::lock_guard<std::mutex> lock(client_mutex_);
     if (!client_connection_) {
-        client_connection_ = client_(config_);
+        client_connection_ = std::make_unique<WebsocketServerClient>(config_.server_port);
         client_connection_->connect();
         connected_ = client_connection_->is_connected();
     }
-}
-
-std::unique_ptr<IWebsocketClient> VRManager::create_default_client(const Config& config) {
-    return std::make_unique<WebsocketServerClient>(config);
 }
 
 void VRManager::handle_frame(VRState&& frame) {

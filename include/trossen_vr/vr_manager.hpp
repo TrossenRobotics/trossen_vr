@@ -4,61 +4,101 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
 
+#include <websocketpp/config/asio_no_tls.hpp> 
+#include <websocketpp/server.hpp>
+
 #include "trossen_vr/vr_types.hpp"
 
 namespace trossen_vr {
 
 class Teleop;
+class VRManager;
 
 /**
- * @class IWebsocketClient
- * @brief Interface abstraction for WebSocket transport used by VRManager.
+ * @class WebsocketServerClient
+ * @brief WebSocket server implementation for receiving VR input from remote clients.
  *
- * This interface allows VRManager to operate with any WebSocket backend.
- * Implementations must provide connection management, message sending,
- * and timed frame reception.
+ * This class implements a WebSocket server that listens for incoming connections
+ * from VR rigs and receives JSON-encoded VR state frames containing controller
+ * poses and button data.
+ *
+ * Thread-safety:
+ * - Connection state is protected by conn_mutex_
+ * - Message queue is protected by msg_mutex_
+ * - Can safely be called from multiple threads
  */
-class IWebsocketClient {
+class WebsocketServerClient {
 public:
-    virtual ~IWebsocketClient() = default;
+    /**
+     * @brief Construct a WebSocket server client with the given port.
+     * @param port Server port to listen on.
+     */
+    explicit WebsocketServerClient(uint16_t port);
 
     /**
-     * @brief Establish the WebSocket connection.
+     * @brief Start the WebSocket server and begin listening for connections.
+     * 
+     * Initializes the ASIO I/O context, sets up connection/message handlers,
+     * and starts listening on the configured port. Launches a background thread
+     * to run the I/O loop.
+     *
+     * @throws std::runtime_error if the server fails to listen on the port.
      */
-    virtual void connect() = 0;
+    void connect();
 
     /**
-     * @brief Close the WebSocket connection.
+     * @brief Stop the WebSocket server and close all connections.
+     * 
+     * Stops the ASIO I/O context and joins the background I/O thread.
      */
-    virtual void disconnect() = 0;
+    void disconnect();
 
     /**
-     * @brief Check whether the client is currently connected.
-     * @return true if connected, false otherwise.
+     * @brief Check if a VR client is currently connected.
+     * @return true if a client connection is established, false otherwise.
      */
-    virtual bool is_connected() const = 0;
+    bool is_connected() const;
 
     /**
      * @brief Read a VR input frame with timeout.
+     * 
+     * Polls for incoming messages and parses the most recent JSON frame
+     * containing VR controller poses and button states. Blocks up to the
+     * specified timeout waiting for a frame.
      *
-     * @param timeout Maximum duration to block for a frame.
-     * @return A frame if received, or std::nullopt if timeout or no data.
+     * @param timeout Maximum duration to wait for a frame.
+     * @return A VRState frame if received and parsed successfully, std::nullopt otherwise.
      */
-    virtual std::optional<VRState> read_frame(std::chrono::milliseconds timeout) = 0;
+    std::optional<VRState> read_frame(std::chrono::milliseconds timeout);
 
     /**
-     * @brief Send a payload string over the WebSocket connection.
+     * @brief Send a message payload to the connected VR client.
+     * 
+     * Transmits a string payload over the WebSocket connection if a client
+     * is currently connected.
      *
-     * @param payload Serialized data to transmit.
+     * @param payload String data to send to the VR client.
      */
-    virtual void send(const std::string& payload) = 0;
+    void send(const std::string& payload);
+
+private:
+    uint16_t extract_port(const std::string& uri);
+
+    uint16_t port_ {4582};
+    websocketpp::server<websocketpp::config::asio> s_;
+    websocketpp::connection_hdl connection_;
+    mutable std::mutex conn_mutex_;
+    mutable std::mutex msg_mutex_;
+    std::string last_message_;
+    std::atomic<bool> connected_;
+    std::thread thread_;
+    uint64_t sequence_;
 };
 
 /**
@@ -87,13 +127,10 @@ public:
      * read_timeout: Max duration to block waiting for a VR frame.
      */
     struct Config {
-        uint16_t server_port = 5432; 
+        uint16_t server_port {4582}; 
         std::chrono::milliseconds reconnect_delay{1000};
         std::chrono::milliseconds read_timeout{50};
     };
-
-    // Factory type for supplying custom WebSocket client implementations.
-    using Client = std::function<std::unique_ptr<IWebsocketClient>(const Config&)>;
 
     /**
      * @brief Construct VRManager using the default WebSocket client implementation (server-mode).
@@ -101,14 +138,6 @@ public:
      * @param config Connection and operating parameters.
      */
     explicit VRManager(Config config);
-
-    /**
-     * @brief Construct VRManager with a user-provided WebSocket client factory.
-     *
-     * @param config VR manager configuration.
-     * @param client Custom client factory.
-     */
-    VRManager(Config config, Client client);
 
     /**
      * @brief Destructor shuts down I/O thread and cleans up resources.
@@ -165,14 +194,22 @@ public:
     std::optional<VRState> get_latest_frame() const;
 
     /**
-     * @brief Poll the Teleop instance for outbound messages to send to VR.
+     * @brief Poll the Teleop instance for messages to send to robot.
      *
-     * If Teleop has posted an update, VRManager will transmit it using the
-     * WebSocket client. Called regularly inside the I/O loop.
+     * If Teleop has posted an update, VRManager will transmit it to the robot. 
+     * Called regularly inside the I/O loop.
      *
      * @param teleop Teleop instance being polled.
      */  
     void poll_teleop(Teleop& teleop);
+
+
+    /**
+     * @brief Poll the the vr_manager for a vrstate frame manually (without starting the io thread).
+     *
+     * @param manual Indicates manual polling mode.
+     */  
+    std::optional<VRState> get_current_state();
 
 private:
     /**
@@ -181,7 +218,6 @@ private:
      * Handles reconnection logic, frame reading, and outbound Teleop updates.
      */
     void run();
-
     /**
      * @brief Process a newly received VR input frame.
      *
@@ -203,22 +239,14 @@ private:
      */
     void ensure_client();
 
-    /**
-     * @brief Create the default WebSocket server implementation.
-     *
-     * @param config VR manager configuration.
-     * @return A fully constructed WebSocket server client.
-     */
-    static std::unique_ptr<IWebsocketClient> create_default_client(const Config& config);
-
     Config config_;
-    std::unique_ptr<IWebsocketClient> client_connection_;
-    Client client_;
+    std::unique_ptr<WebsocketServerClient> client_connection_;
     mutable std::mutex client_mutex_;
 
     std::thread io_thread_;
     mutable std::mutex lifecycle_mutex_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> manual_mode_{false};
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> connected_{false};
 
