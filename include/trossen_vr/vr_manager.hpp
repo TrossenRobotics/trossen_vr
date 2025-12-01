@@ -10,11 +10,96 @@
 #include <string>
 #include <thread>
 
+#include <websocketpp/config/asio_no_tls.hpp> 
+#include <websocketpp/server.hpp>
+
 #include "trossen_vr/vr_types.hpp"
 
 namespace trossen_vr {
 
 class Teleop;
+class VRManager;
+
+/**
+ * @class WebsocketServerClient
+ * @brief WebSocket server implementation for receiving VR input from remote clients.
+ *
+ * This class implements a WebSocket server that listens for incoming connections
+ * from VR rigs and receives JSON-encoded VR state frames containing controller
+ * poses and button data.
+ *
+ * Thread-safety:
+ * - Connection state is protected by conn_mutex_
+ * - Message queue is protected by msg_mutex_
+ * - Can safely be called from multiple threads
+ */
+class WebsocketServerClient {
+public:
+    /**
+     * @brief Construct a WebSocket server client with the given port.
+     * @param port Server port to listen on.
+     */
+    explicit WebsocketServerClient(uint16_t port);
+
+    /**
+     * @brief Start the WebSocket server and begin listening for connections.
+     * 
+     * Initializes the ASIO I/O context, sets up connection/message handlers,
+     * and starts listening on the configured port. Launches a background thread
+     * to run the I/O loop.
+     *
+     * @throws std::runtime_error if the server fails to listen on the port.
+     */
+    void connect();
+
+    /**
+     * @brief Stop the WebSocket server and close all connections.
+     * 
+     * Stops the ASIO I/O context and joins the background I/O thread.
+     */
+    void disconnect();
+
+    /**
+     * @brief Check if a VR client is currently connected.
+     * @return true if a client connection is established, false otherwise.
+     */
+    bool is_connected() const;
+
+    /**
+     * @brief Read a VR input frame with timeout.
+     * 
+     * Polls for incoming messages and parses the most recent JSON frame
+     * containing VR controller poses and button states. Blocks up to the
+     * specified timeout waiting for a frame.
+     *
+     * @param timeout Maximum duration to wait for a frame.
+     * @return A VRState frame if received and parsed successfully, std::nullopt otherwise.
+     */
+    std::optional<VRState> read_frame(std::chrono::milliseconds timeout);
+
+    /**
+     * @brief Send a message payload to the connected VR client.
+     * 
+     * Transmits a string payload over the WebSocket connection if a client
+     * is currently connected.
+     *
+     * @param payload String data to send to the VR client.
+     */
+    void send(const std::string& payload);
+
+private:
+    uint16_t extract_port(const std::string& uri);
+
+    uint16_t port_ {4582};
+    websocketpp::server<websocketpp::config::asio> s_;
+    websocketpp::connection_hdl connection_;
+    mutable std::mutex conn_mutex_;
+    mutable std::mutex msg_mutex_;
+    std::string last_message_;
+    std::atomic<bool> connected_;
+    std::thread thread_;
+    uint64_t sequence_;
+};
 
 /**
  * @class VRManager
@@ -42,7 +127,7 @@ public:
      * read_timeout: Max duration to block waiting for a VR frame.
      */
     struct Config {
-        uint16_t server_port {}; 
+        uint16_t server_port {4582}; 
         std::chrono::milliseconds reconnect_delay{1000};
         std::chrono::milliseconds read_timeout{50};
     };
@@ -122,8 +207,6 @@ public:
     /**
      * @brief Poll the the vr_manager for a vrstate frame manually (without starting the io thread).
      *
-     * 
-     *
      * @param manual Indicates manual polling mode.
      */  
     std::optional<VRState> get_current_state();
@@ -156,16 +239,8 @@ private:
      */
     void ensure_client();
 
-    /**
-     * @brief Create the default WebSocket server implementation.
-     *
-     * @param config VR manager configuration.
-     * @return A fully constructed WebSocket server client.
-     */
-    static std::unique_ptr<void, void(*)(void*)> create_default_client(const Config& config);
-
     Config config_;
-    std::unique_ptr<void, void(*)(void*)> client_connection_;
+    std::unique_ptr<WebsocketServerClient> client_connection_;
     mutable std::mutex client_mutex_;
 
     std::thread io_thread_;
