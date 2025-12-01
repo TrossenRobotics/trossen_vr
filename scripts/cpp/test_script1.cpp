@@ -82,7 +82,7 @@ int main() {
     // ---------------------------
     Teleop teleop;
 
-    bool pause_teleop = false;
+    bool pause_teleop = true;
     std::optional<std::array<double,6>> init_right_pose;
     std::optional<std::array<double,6>> init_robot_pose;
     Eigen::Matrix4d T_offset_right = Eigen::Matrix4d::Identity();
@@ -124,7 +124,8 @@ int main() {
     teleop.set_button_B_handler([&](){ driver.set_arm_positions(IDLE_POSE, 3.0, true); });
 
     // Gripper handled in right pose handler using button map
-    teleop.set_button_trigger_handler([&]() {
+    teleop.set_button_right_trigger_handler([&]() {
+
         auto trigger_val_opt = vr_manager.get_button_state("right_trigger");
         if (trigger_val_opt.has_value()) {
             double trigger_val = std::get<double>(*trigger_val_opt);
