@@ -81,13 +81,9 @@ git clone https://github.com/TrossenRobotics/trossen_vr.git
 
 ### 2. Ensure libtrossen_arm is Installed
 
-The project requires `libtrossen_arm` to be installed and available to CMake. If not already installed:
+The project requires `libtrossen_arm` to be installed and available to CMake. Follow the installation instructions at:
 
-```bash
-pip install trossen_arm
-```
-
-For the C++ library, ensure it's installed system-wide or set the appropriate CMake prefix path.
+https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html#c
 
 ---
 
@@ -163,17 +159,24 @@ cd build
 
 ### Install Python Module
 
-After building, install the Python module to your Python environment:
+To build and install the Python module as a wheel:
 
 ```bash
-# From the build directory
-cp pytrossen_vr.cpython-*.so ~/.local/lib/python3.12/site-packages/
+# From the project root directory
+# First, install the build tool if not already installed
+pip install build
+
+# Build the wheel
+python -m build
+
+# Install the wheel
+pip install dist/trossen_vr-*.whl
 ```
 
-Or for system-wide installation (requires sudo):
+For development installation (editable mode):
 
 ```bash
-sudo cp pytrossen_vr.cpython-*.so /usr/local/lib/python3.12/site-packages/
+pip install -e .
 ```
 
 ### Verify Installation
@@ -288,7 +291,7 @@ while True:
 
 The core component that manages WebSocket server communication:
 
-- **Server Mode**: Listens on a configurable port (default: 5432) for VR client connections
+- **Server Mode**: Listens on a configurable port (default: 4582) for VR client connections
 - **Frame Reception**: Receives JSON-encoded `VRState` frames containing poses and button states
 - **Thread-Safe**: All operations are thread-safe for multi-threaded applications
 - **Two Usage Modes**:
@@ -307,7 +310,9 @@ Event-driven abstraction for handling VR input:
 
 Represents a complete frame of VR input data:
 
-- `left_pose`, `right_pose`: Optional 6-DOF poses (position + rotation vector)
+- `left_pose`, `right_pose`: Optional 6-DOF poses with:
+  - `position`: 3D position vector in meters [x, y, z]
+  - `rotation`: 3D rotation vector in radians using axis-angle representation where the vector direction is the rotation axis and the magnitude is the rotation angle
 - `buttons`: Map of button names to values (variant of `bool` or `double` for analog inputs)
 - `timestamp`: Frame timestamp
 - `sequence`: Frame sequence number
