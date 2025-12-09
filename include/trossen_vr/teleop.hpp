@@ -53,17 +53,41 @@ public:
    */
   void set_button_B_handler(ActionHandler handler);
 
+    /**
+   * @brief Register a callback for the X button.
+   * @param handler Function to invoke upon rising edge of the X button.
+   */
+  void set_button_X_handler(ActionHandler handler);
+
+  /**
+   * @brief Register a callback for the Y button.
+   * @param handler Function to invoke upon rising edge of the Y button.
+   */
+  void set_button_Y_handler(ActionHandler handler);
+
   /**
    * @brief Register a callback for the trigger button.
    * @param handler Function to invoke when the trigger is pressed.
    */
-  void set_button_trigger_handler(ActionHandler handler);
+  void set_button_right_trigger_handler(ActionHandler handler);
 
   /**
    * @brief Register a callback for the grip button.
    * @param handler Function to invoke when the grip button is pressed.
    */
-  void set_button_grip_handler(ActionHandler handler);
+  void set_button_right_grip_handler(ActionHandler handler);
+
+    /**
+   * @brief Register a callback for the trigger button.
+   * @param handler Function to invoke when the trigger is pressed.
+   */
+  void set_button_left_trigger_handler(ActionHandler handler);
+
+  /**
+   * @brief Register a callback for the grip button.
+   * @param handler Function to invoke when the grip button is pressed.
+   */
+  void set_button_left_grip_handler(ActionHandler handler);
 
 
   /**
@@ -96,12 +120,6 @@ public:
    * @param handler Function receiving VRPose for the right controller.
    */
   void set_right_pose_handler(PoseHandler handler);
-
-  /**
-   * @brief Set a callback invoked for all pose updates (left or right).
-   * @param handler Function receiving every VRPose update.
-   */
-  void set_pose_handler(PoseHandler handler);
 
   /**
    * @brief Set user-defined exit condition predicate.
@@ -160,7 +178,7 @@ public:
   *
   * @param pose Pose data from the VR system.
   */
-  void handle_pose(const VRPose& pose) const;
+  void handle_pose(const VRPose& pose, const std::string& controller) const;
 
   /**
   * @brief Evaluate button states and dispatch handlers.
@@ -206,7 +224,7 @@ protected:
   *
   * @param flags Bitmask encoding configuration options.
   */
-  virtual void on_configure(std::uint32_t flags) = 0;
+  virtual void on_configure(std::uint32_t flags) {};
 
   /**
   * @brief Post a serialized update to the outbound message buffer.
@@ -231,9 +249,9 @@ protected:
 private:
   std::unordered_map<std::string, ActionHandler> button_handlers_;
   std::unordered_map<std::string, bool> previous_button_states_;
+  std::unordered_map<std::string, double> previous_analog_states_;
   PoseHandler left_pose_handler_;
   PoseHandler right_pose_handler_;
-  PoseHandler pose_handler_;
   ActionHandler on_start_;
   ActionHandler on_pause_;
   ActionHandler on_resume_;
