@@ -1,0 +1,20 @@
+[project]
+name = "trossen-vr"
+version = "0.1.0"
+description = "Python bindings and SDK for Trossen VR teleoperation"
+authors = [
+    { name = "Trossen Robotics" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "numpy==2.3.5",
+    "scipy==1.16.3",
+    "trossen-arm==1.9.0",
+    "websockets==15.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/TrossenRobotics/trossen_vr"
+Repository = "https://github.com/TrossenRobotics/trossen_vr"
