@@ -1,10 +1,7 @@
-.vscode
 build/
-lib/
-lib64/
-bin/
-pyvenv/
-__pycache__/
-.cache/
-cmake/
 .venv/
+__pycache__/
+.vscode/
+.cache/
+vr_controller/
+uv.lock

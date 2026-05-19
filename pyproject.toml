@@ -9,10 +9,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
-    "numpy==2.3.5",
-    "scipy==1.16.3",
-    "trossen-arm==1.9.0",
-    "websockets==15.0.1",
+    "numpy>=2.0",
+    "trossen-arm>=1.9.0",
 ]
 
 [project.urls]

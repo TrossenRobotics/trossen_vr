@@ -1,9 +1,7 @@
-#ifndef TROSSEN_VR__INCLUDE__VR_TYPES_HPP_
-#define TROSSEN_VR__INCLUDE__VR_TYPES_HPP_
+#pragma once
 
-#include <array>
-#include <chrono>
-#include <cstdint>
+#include <Eigen/Dense>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -11,73 +9,122 @@
 
 namespace trossen_vr {
 
+// Pose represented as 6-vector: [x, y, z, rx, ry, rz]
+// Position in meters, rotation as axis-angle (rotation vector)
+using Vec6 = Eigen::Matrix<double, 6, 1>;
 
-/**
- * @struct VRPose
- * @brief Represents a 6-DoF pose consisting of position and rotation vectors.
- *
- * This structure stores the spatial pose of a VR controller or tracked object.
- * The `position` field contains a three-element array representing X, Y, Z 
- * translation in meters. The `rotation` field contains a three-element rotation 
- * vector, typically interpreted as an axis-angle representation where the vector 
- * direction encodes the axis of rotation and the magnitude encodes the angle.
- */
-struct VRPose {
-  std::array<double, 3> position{};
-  std::array<double, 3> rotation{};
+// A button value is either a bool (digital) or double (analog)
+using ButtonValue = std::variant<bool, double>;
+
+// Per-hand controller pose (position + rotation only)
+struct ControllerPose {
+    Eigen::Vector3d position = Eigen::Vector3d::Zero();
+    Eigen::Quaterniond rotation = Eigen::Quaterniond::Identity();
 };
 
-/**
- * @typedef VRButtonValue
- * @brief Variant type representing the state of a VR button.
- *
- * A button may report:
- * - A boolean value indicating pressed/released.
- * - A double value representing an analog value (e.g., trigger pressure).
- */
-using VRButtonValue = std::variant<bool, double>;
-
-/**
- * @enum VRCommand
- * @brief Enumerates high-level control commands emitted by the VR system.
- *
- * These commands are used for signaling teleoperation lifecycle changes, such as
- * starting, pausing, or resuming VR control.
- */
-enum class VRCommand {
-  Start,
-  Pause,
-  Resume
+// Full VR frame: both controller poses + generic button map
+struct VRFrame {
+    std::optional<ControllerPose> right;
+    std::optional<ControllerPose> left;
+    std::unordered_map<std::string, ButtonValue> buttons;
 };
 
-/**
- * @struct VRState
- * @brief Complete snapshot of VR input at a given moment.
- *
- * This structure represents the full set of data arriving from the VR system for
- * a single frame of input. It may contain controller poses, button states, system
- * commands, and a timestamp.
- *
- * Fields:
- * - `left_pose`: Optional pose of the left controller.
- * - `right_pose`: Optional pose of the right controller.
- * - `buttons`: Mapping of button names to their boolean or analog states.
- * - `command`: Optional high-level VR command (start, pause, resume).
- * - `timestamp`: Time at which the frame was generated.
- * - `sequence`: Monotonically increasing sequence ID for ordering frames.
- */
-struct VRState {
-  std::optional<VRPose> left_pose;
-  std::optional<VRPose> right_pose;
+// ---------------------------------------------------------------------------
+// Coordinate transforms
+// ---------------------------------------------------------------------------
 
-  // button name - either a bool or a double
-  std::unordered_map<std::string, VRButtonValue> buttons;
+// Convert a 6-vector (pos + rotation vector) to a 4x4 homogeneous transform
+inline Eigen::Matrix4d vec6_to_T(const Vec6& v6) {
+    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
 
-  std::optional<VRCommand> command;
-  std::chrono::steady_clock::time_point timestamp{};
-  std::uint64_t sequence{0};
-};
+    T.block<3, 1>(0, 3) = v6.head<3>();
 
+    Eigen::Vector3d rvec = v6.tail<3>();
+    double angle = rvec.norm();
+    if (angle > 1e-8) {
+        Eigen::AngleAxisd aa(angle, rvec / angle);
+        T.block<3, 3>(0, 0) = aa.toRotationMatrix();
+    }
+
+    return T;
 }
 
-#endif // TROSSEN_VR__INCLUDE__VR_TYPES_HPP_
+// Convert a 4x4 homogeneous transform to a 6-vector
+inline Vec6 T_to_vec6(const Eigen::Matrix4d& T) {
+    Vec6 v6;
+    v6.head<3>() = T.block<3, 1>(0, 3);
+
+    Eigen::AngleAxisd aa(T.block<3, 3>(0, 0));
+    v6.tail<3>() = aa.axis() * aa.angle();
+
+    return v6;
+}
+
+// Convert Unity (left-handed, Y-up) pose to robot frame 6-vector
+// Position:  Unity (right, up, forward) → Robot (forward, left, up)
+// Rotation:  axis remapped with same convention
+inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
+                               const Eigen::Quaterniond& rot) {
+    Vec6 v6;
+
+    // Position remap
+    v6[0] =  pos.z();   // forward
+    v6[1] = -pos.x();   // left
+    v6[2] =  pos.y();   // up
+
+    // Rotation remap
+    Eigen::AngleAxisd aa(rot);
+    double angle = aa.angle();
+
+    if (angle < 1e-8) {
+        v6.tail<3>().setZero();
+    } else {
+        Eigen::Vector3d axis_unity = aa.axis();
+        Eigen::Vector3d axis_robot(-axis_unity.z(), axis_unity.x(), -axis_unity.y());
+        v6.tail<3>() = axis_robot * angle;
+    }
+
+    return v6;
+}
+
+// ---------------------------------------------------------------------------
+// JSON parsing
+// ---------------------------------------------------------------------------
+
+// Parse a full VR frame from JSON sent by the Unity app
+inline VRFrame parse_vr_frame(const nlohmann::json& data) {
+    VRFrame frame;
+
+    if (data.contains("rightPosition") && data.contains("rightRotation")) {
+        const auto& rp = data["rightPosition"];
+        const auto& rr = data["rightRotation"];
+        ControllerPose pose;
+        pose.position = Eigen::Vector3d(rp["x"], rp["y"], rp["z"]);
+        pose.rotation = Eigen::Quaterniond(rr["w"], rr["x"], rr["y"], rr["z"]);
+        frame.right = pose;
+    }
+
+    if (data.contains("leftPosition") && data.contains("leftRotation")) {
+        const auto& lp = data["leftPosition"];
+        const auto& lr = data["leftRotation"];
+        ControllerPose pose;
+        pose.position = Eigen::Vector3d(lp["x"], lp["y"], lp["z"]);
+        pose.rotation = Eigen::Quaterniond(lr["w"], lr["x"], lr["y"], lr["z"]);
+        frame.left = pose;
+    }
+
+    // Parse generic button map
+    if (data.contains("buttons") && data["buttons"].is_object()) {
+        for (auto& [key, val] : data["buttons"].items()) {
+            if (val.is_boolean()) {
+                frame.buttons[key] = val.get<bool>();
+            } else if (val.is_number()) {
+                frame.buttons[key] = val.get<double>();
+            }
+        }
+    }
+
+    return frame;
+}
+
+} // namespace trossen_vr
