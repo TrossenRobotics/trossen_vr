@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
 #include "trossen_vr/vr_types.hpp"

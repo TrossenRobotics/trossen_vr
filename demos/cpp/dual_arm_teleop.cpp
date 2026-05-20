@@ -4,6 +4,7 @@
 #include <chrono>
 #include <array>
 #include <thread>
+#include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
 #include "trossen_vr/vr_types.hpp"
