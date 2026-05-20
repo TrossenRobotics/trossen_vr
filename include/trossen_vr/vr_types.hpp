@@ -87,27 +87,31 @@ inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
 inline VRFrame parse_vr_frame(const nlohmann::json& data) {
     VRFrame frame;
 
-    if (data.contains("rightPosition") && data.contains("rightRotation")) {
-        const auto& rp = data["rightPosition"];
-        const auto& rr = data["rightRotation"];
-        if (rp.is_object() && rr.is_object()) {
-            ControllerPose pose;
-            pose.position = Eigen::Vector3d(rp["x"], rp["y"], rp["z"]);
-            pose.rotation = Eigen::Quaterniond(rr["w"], rr["x"], rr["y"], rr["z"]);
-            frame.right = pose;
+    try {
+        if (data.contains("rightPosition") && data.contains("rightRotation")) {
+            const auto& rp = data["rightPosition"];
+            const auto& rr = data["rightRotation"];
+            if (rp.is_object() && rr.is_object()) {
+                ControllerPose pose;
+                pose.position = Eigen::Vector3d(rp["x"], rp["y"], rp["z"]);
+                pose.rotation = Eigen::Quaterniond(rr["w"], rr["x"], rr["y"], rr["z"]);
+                frame.right = pose;
+            }
         }
-    }
+    } catch (const nlohmann::json::exception&) {}
 
-    if (data.contains("leftPosition") && data.contains("leftRotation")) {
-        const auto& lp = data["leftPosition"];
-        const auto& lr = data["leftRotation"];
-        if (lp.is_object() && lr.is_object()) {
-            ControllerPose pose;
-            pose.position = Eigen::Vector3d(lp["x"], lp["y"], lp["z"]);
-            pose.rotation = Eigen::Quaterniond(lr["w"], lr["x"], lr["y"], lr["z"]);
-            frame.left = pose;
+    try {
+        if (data.contains("leftPosition") && data.contains("leftRotation")) {
+            const auto& lp = data["leftPosition"];
+            const auto& lr = data["leftRotation"];
+            if (lp.is_object() && lr.is_object()) {
+                ControllerPose pose;
+                pose.position = Eigen::Vector3d(lp["x"], lp["y"], lp["z"]);
+                pose.rotation = Eigen::Quaterniond(lr["w"], lr["x"], lr["y"], lr["z"]);
+                frame.left = pose;
+            }
         }
-    }
+    } catch (const nlohmann::json::exception&) {}
 
     if (data.contains("buttons") && data["buttons"].is_object()) {
         for (auto& [key, val] : data["buttons"].items()) {
