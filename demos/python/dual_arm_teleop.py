@@ -1,17 +1,20 @@
-import time
 import signal
-import numpy as np
-import trossen_vr as vr
-import trossen_arm
+import time
 
-START_POSE = [0, np.pi/3, np.pi/6, np.pi/5, 0, 0]
+import numpy as np
+import trossen_arm
+import trossen_vr as vr
+
+START_POSE = [0, np.pi / 3, np.pi / 6, np.pi / 5, 0, 0]
 IDLE_POSE = [0, 0, 0, 0, 0, 0]
 
 running = True
 
+
 def signal_handler(sig, frame):
     global running
     running = False
+
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -28,7 +31,8 @@ right_driver = trossen_arm.TrossenArmDriver()
 right_driver.configure(
     trossen_arm.Model.wxai_v0,
     trossen_arm.StandardEndEffector.wxai_v0_leader,
-    config.right_arm_ip, False
+    config.right_arm_ip,
+    False,
 )
 right_driver.set_all_modes(trossen_arm.Mode.position)
 
@@ -36,7 +40,8 @@ left_driver = trossen_arm.TrossenArmDriver()
 left_driver.configure(
     trossen_arm.Model.wxai_v0,
     trossen_arm.StandardEndEffector.wxai_v0_leader,
-    config.left_arm_ip, False
+    config.left_arm_ip,
+    False,
 )
 left_driver.set_all_modes(trossen_arm.Mode.position)
 
@@ -128,14 +133,16 @@ while running:
             right_driver.set_cartesian_positions(
                 vr.T_to_vec6(T_cmd).tolist(),
                 trossen_arm.InterpolationSpace.cartesian,
-                config.cmd_goal_time, False
+                config.cmd_goal_time,
+                False,
             )
         if left_vr_vec6 is not None:
             T_cmd = left_offset @ vr.vec6_to_T(left_vr_vec6)
             left_driver.set_cartesian_positions(
                 vr.T_to_vec6(T_cmd).tolist(),
                 trossen_arm.InterpolationSpace.cartesian,
-                config.cmd_goal_time, False
+                config.cmd_goal_time,
+                False,
             )
 
 receiver.stop()
