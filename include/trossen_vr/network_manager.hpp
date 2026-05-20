@@ -2,6 +2,7 @@
 
 #include "trossen_vr/vr_types.hpp"
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
