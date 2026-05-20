@@ -36,7 +36,7 @@ cmake --install build
 
 > **Before running any demo**, start the Trossen VR Teleop app on your Meta Quest headset. In the app, enter the IP address of the PC running the demo and press **Connect**. The headset and PC must be on the same network.
 
-> **Update the robot IP addresses** in the demo source files to match your setup. The defaults are `192.168.1.4` (right arm) and `192.168.1.2` (left arm).
+> **Update the robot IP addresses** in the demo source files to match your setup. The defaults are `192.168.1.2` (right arm) and `192.168.1.3` (left arm).
 
 **C++ demos** are in `demos/cpp/`:
 

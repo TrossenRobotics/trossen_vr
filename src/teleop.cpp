@@ -1,5 +1,7 @@
 #include "trossen_vr/teleop.hpp"
 
+#include <utility>
+
 namespace trossen_vr {
 
 void Teleop::on_button(const std::string& name, ButtonHandler handler) {
