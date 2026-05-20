@@ -16,7 +16,14 @@ PYBIND11_MODULE(trossen_vr, m) {
     py::class_<trossen_vr::ControllerPose>(m, "ControllerPose")
         .def(py::init<>())
         .def_readwrite("position", &trossen_vr::ControllerPose::position)
-        .def_readwrite("rotation", &trossen_vr::ControllerPose::rotation);
+        .def_property("rotation",
+            [](const trossen_vr::ControllerPose& self) -> Eigen::Vector4d {
+                const auto& q = self.rotation;
+                return Eigen::Vector4d(q.w(), q.x(), q.y(), q.z());
+            },
+            [](trossen_vr::ControllerPose& self, const Eigen::Vector4d& v) {
+                self.rotation = Eigen::Quaterniond(v[0], v[1], v[2], v[3]);
+            });
 
     // VRFrame
     py::class_<trossen_vr::VRFrame>(m, "VRFrame")
@@ -61,5 +68,10 @@ PYBIND11_MODULE(trossen_vr, m) {
     // Free functions
     m.def("vec6_to_T", &trossen_vr::vec6_to_T);
     m.def("T_to_vec6", &trossen_vr::T_to_vec6);
-    m.def("unity_pose_to_vec6", &trossen_vr::unity_pose_to_vec6);
+    m.def("unity_pose_to_vec6",
+        [](const Eigen::Vector3d& pos, const Eigen::Vector4d& rot) {
+            return trossen_vr::unity_pose_to_vec6(
+                pos, Eigen::Quaterniond(rot[0], rot[1], rot[2], rot[3]));
+        },
+        py::arg("pos"), py::arg("rot"));
 }
