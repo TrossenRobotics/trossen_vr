@@ -12,7 +12,6 @@ namespace trossen_vr {
 
 UDPReceiver::UDPReceiver(const ReceiverConfig& config)
     : buffer_size_(config.buffer_size) {
-    buffer_ = new char[buffer_size_];
 
     sockfd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd_ < 0) {
@@ -28,6 +27,8 @@ UDPReceiver::UDPReceiver(const ReceiverConfig& config)
         close(sockfd_);
         throw std::runtime_error("Bind failed on port " + std::to_string(config.port));
     }
+
+    buffer_ = new char[buffer_size_];
 }
 
 UDPReceiver::~UDPReceiver() {
@@ -87,8 +88,8 @@ void UDPReceiver::run() {
             auto frame = parse_vr_frame(data);
             std::lock_guard<std::mutex> lock(frame_mutex_);
             latest_frame_ = std::move(frame);
-        } catch (const nlohmann::json::parse_error&) {
-            // Skip malformed packets silently
+        } catch (const nlohmann::json::exception&) {
+            // Skip malformed or unexpected packets silently
         }
     }
 }
