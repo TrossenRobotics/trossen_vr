@@ -21,8 +21,8 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 config = vr.TeleopConfig()
-config.right_arm_ip = "192.168.1.4"
-config.left_arm_ip = "192.168.1.2"
+config.right_arm_ip = "192.168.1.2"
+config.left_arm_ip = "192.168.1.3"
 config.send_rate_hz = 100.0
 config.gripper_max_m = 0.04
 config.cmd_goal_time = 0.15

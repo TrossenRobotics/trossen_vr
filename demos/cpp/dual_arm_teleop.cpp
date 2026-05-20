@@ -11,10 +11,10 @@
 #include "trossen_vr/network_manager.hpp"
 #include "trossen_vr/teleop.hpp"
 
-static volatile bool running = true;
+static volatile std::sig_atomic_t running = 1;
 
 void signal_handler(int) {
-    running = false;
+    running = 0;
 }
 
 struct ArmTeleopState {
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
 
     // --- Configuration ---
     trossen_vr::TeleopConfig config;
-    config.right_arm_ip = "192.168.1.4";
-    config.left_arm_ip = "192.168.1.2";
+    config.right_arm_ip = "192.168.1.2";
+    config.left_arm_ip = "192.168.1.3";
     config.send_rate_hz = 100.0;
     config.gripper_max_m = 0.04;
     config.cmd_goal_time = 0.15;
