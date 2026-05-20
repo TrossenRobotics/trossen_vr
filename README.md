@@ -6,13 +6,18 @@ C++ and Python SDK for controlling Trossen robot arms using Meta Quest VR contro
 
 - [Eigen3](https://eigen.tuxfamily.org/) >= 3.3
 - [nlohmann/json](https://github.com/nlohmann/json) >= 3.2
-- [libtrossen_arm](https://docs.trossenrobotics.com/trossen_arm/)
-- [pybind11](https://github.com/pybind/pybind11) >= 2.11 (for Python bindings)
-- Python >= 3.11, [uv](https://docs.astral.sh/uv/)
+- [libtrossen_arm](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html#c)
+- Python >= 3.11
+- [uv](https://docs.astral.sh/uv/)
+
+## Setup
 
 ```bash
 sudo apt install -y cmake build-essential libeigen3-dev nlohmann-json3-dev
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+Follow the [libtrossen_arm C++ installation guide](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html#c) to install the libtrossen_arm robot driver.
 
 ## Build
 
