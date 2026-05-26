@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 
 #include <iostream>
@@ -13,11 +14,11 @@
 namespace trossen_vr {
 
 UDPReceiver::UDPReceiver(const ReceiverConfig& config)
-    : buffer_size_(config.buffer_size) {
+    : buffer_(config.buffer_size) {
 
     sockfd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd_ < 0) {
-        throw std::runtime_error("Socket creation failed");
+        throw std::runtime_error("Socket creation failed: " + std::string(std::strerror(errno)));
     }
 
     sockaddr_in servaddr{};
@@ -26,11 +27,11 @@ UDPReceiver::UDPReceiver(const ReceiverConfig& config)
     servaddr.sin_port = htons(config.port);
 
     if (bind(sockfd_, reinterpret_cast<const sockaddr*>(&servaddr), sizeof(servaddr)) < 0) {
+        int bind_errno = errno;
         close(sockfd_);
-        throw std::runtime_error("Bind failed on port " + std::to_string(config.port));
+        throw std::runtime_error("Bind failed on port " + std::to_string(config.port) +
+                                 ": " + std::strerror(bind_errno));
     }
-
-    buffer_ = new char[buffer_size_];
 }
 
 UDPReceiver::~UDPReceiver() {
@@ -38,7 +39,6 @@ UDPReceiver::~UDPReceiver() {
     if (sockfd_ >= 0) {
         close(sockfd_);
     }
-    delete[] buffer_;
 }
 
 void UDPReceiver::start() {
@@ -78,7 +78,7 @@ void UDPReceiver::run() {
         // Drain all queued packets, keep only the last one (newest-frame-wins)
         int last_n = -1;
         while (true) {
-            int n = recvfrom(sockfd_, buffer_, buffer_size_, MSG_DONTWAIT, nullptr, nullptr);
+            int n = recvfrom(sockfd_, buffer_.data(), buffer_.size(), MSG_DONTWAIT, nullptr, nullptr);
             if (n <= 0) break;
             last_n = n;
         }
@@ -86,7 +86,7 @@ void UDPReceiver::run() {
         if (last_n <= 0) continue;
 
         try {
-            auto data = nlohmann::json::parse(buffer_, buffer_ + last_n);
+            auto data = nlohmann::json::parse(buffer_.data(), buffer_.data() + last_n);
             auto frame = parse_vr_frame(data);
             std::lock_guard<std::mutex> lock(frame_mutex_);
             latest_frame_ = std::move(frame);

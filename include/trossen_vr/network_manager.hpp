@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <vector>
 
 #include "trossen_vr/vr_types.hpp"
 
@@ -15,7 +16,7 @@ namespace trossen_vr {
 
 struct ReceiverConfig {
     uint16_t port = 9000;
-    size_t buffer_size = 2048;
+    size_t buffer_size = 2048;  // UDP receive buffer size in bytes
 };
 
 // UDP receiver that always holds the newest VR frame.
@@ -42,8 +43,7 @@ private:
     void run();
 
     int sockfd_ = -1;
-    size_t buffer_size_;
-    char* buffer_ = nullptr;
+    std::vector<char> buffer_;
 
     std::thread thread_;
     std::atomic<bool> running_{false};
