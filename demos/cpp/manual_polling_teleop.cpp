@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
         }
         const auto& frame = *frame_opt;
 
-        if (edges.pressed(frame, "a")) {
+        if (edges.pressed(frame, trossen_vr::ButtonNames::A)) {
             teleop_active = !teleop_active;
             if (teleop_active) {
                 offset_captured = false;
@@ -118,15 +118,15 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (edges.pressed(frame, "b")) {
+        if (edges.pressed(frame, trossen_vr::ButtonNames::B)) {
             std::cout << "Exit requested via B button" << std::endl;
             break;
         }
 
-        double right_trig = edges.analog(frame, "rightTrigger");
+        double right_trig = edges.analog(frame, trossen_vr::ButtonNames::RightTrigger);
         right_driver.set_gripper_position(right_trig * gripper_max_m, 0.0, false);
 
-        double left_trig = edges.analog(frame, "leftTrigger");
+        double left_trig = edges.analog(frame, trossen_vr::ButtonNames::LeftTrigger);
         left_driver.set_gripper_position(left_trig * gripper_max_m, 0.0, false);
 
         if (!teleop_active) continue;

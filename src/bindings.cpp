@@ -30,7 +30,11 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def(py::init<>())
         .def_readwrite("right", &trossen_vr::VRFrame::right)
         .def_readwrite("left", &trossen_vr::VRFrame::left)
-        .def_readwrite("buttons", &trossen_vr::VRFrame::buttons);
+        .def_readwrite("buttons", &trossen_vr::VRFrame::buttons)
+        .def("get_button", &trossen_vr::VRFrame::get_button,
+             "Get digital button state (returns False if not found or wrong type)")
+        .def("get_analog", &trossen_vr::VRFrame::get_analog,
+             "Get analog value (returns 0.0 if not found or wrong type)");
 
     // ReceiverConfig
     py::class_<trossen_vr::ReceiverConfig>(m, "ReceiverConfig")
@@ -55,6 +59,18 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def("on_right_pose", &trossen_vr::Teleop::on_right_pose)
         .def("on_left_pose", &trossen_vr::Teleop::on_left_pose)
         .def("dispatch", &trossen_vr::Teleop::dispatch);
+
+    // ButtonNames constants
+    auto button_names = m.def_submodule("ButtonNames",
+        "Standard button names from Unity VR controller mapping");
+    button_names.attr("A") = trossen_vr::ButtonNames::A;
+    button_names.attr("B") = trossen_vr::ButtonNames::B;
+    button_names.attr("X") = trossen_vr::ButtonNames::X;
+    button_names.attr("Y") = trossen_vr::ButtonNames::Y;
+    button_names.attr("RightTrigger") = trossen_vr::ButtonNames::RightTrigger;
+    button_names.attr("LeftTrigger") = trossen_vr::ButtonNames::LeftTrigger;
+    button_names.attr("RightGrip") = trossen_vr::ButtonNames::RightGrip;
+    button_names.attr("LeftGrip") = trossen_vr::ButtonNames::LeftGrip;
 
     // Free functions
     m.def("vec6_to_T", &trossen_vr::vec6_to_T);

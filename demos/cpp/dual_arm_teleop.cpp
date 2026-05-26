@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     // --- Event-driven teleop setup ---
     trossen_vr::Teleop teleop;
 
-    teleop.on_button("a", [&]() {
+    teleop.on_button(trossen_vr::ButtonNames::A, [&]() {
         if (!right_state.engaged && !left_state.engaged) {
             engage_arm(right_state, right_driver);
             engage_arm(left_state, left_driver);
@@ -117,16 +117,16 @@ int main(int argc, char** argv) {
         }
     });
 
-    teleop.on_button("b", [&]() {
+    teleop.on_button(trossen_vr::ButtonNames::B, [&]() {
         std::cout << "Exit requested via B button" << std::endl;
         running = false;
     });
 
-    teleop.on_analog("rightTrigger", [&](double val) {
+    teleop.on_analog(trossen_vr::ButtonNames::RightTrigger, [&](double val) {
         right_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
     });
 
-    teleop.on_analog("leftTrigger", [&](double val) {
+    teleop.on_analog(trossen_vr::ButtonNames::LeftTrigger, [&](double val) {
         left_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
     });
 

@@ -104,16 +104,16 @@ def handle_left_pose(pose):
     left_vr_vec6 = vr.unity_pose_to_vec6(pose.position, pose.rotation)
 
 
-teleop.on_button("a", handle_a)
-teleop.on_button("b", handle_b)
-teleop.on_analog("rightTrigger", handle_right_trigger)
-teleop.on_analog("leftTrigger", handle_left_trigger)
+teleop.on_button(vr.ButtonNames.A, handle_a)
+teleop.on_button(vr.ButtonNames.B, handle_b)
+teleop.on_analog(vr.ButtonNames.RightTrigger, handle_right_trigger)
+teleop.on_analog(vr.ButtonNames.LeftTrigger, handle_left_trigger)
 teleop.on_right_pose(handle_right_pose)
 teleop.on_left_pose(handle_left_pose)
 
 print("Waiting for VR data... Press A to engage teleop.")
 
-send_period = 1.0 / config.send_rate_hz
+send_period = 1.0 / SEND_RATE_HZ
 last_send = time.monotonic()
 
 while running:
@@ -132,7 +132,7 @@ while running:
             right_driver.set_cartesian_positions(
                 vr.T_to_vec6(T_cmd).tolist(),
                 trossen_arm.InterpolationSpace.cartesian,
-                config.cmd_goal_time,
+                CMD_GOAL_TIME,
                 False,
             )
         if left_vr_vec6 is not None:
@@ -140,7 +140,7 @@ while running:
             left_driver.set_cartesian_positions(
                 vr.T_to_vec6(T_cmd).tolist(),
                 trossen_arm.InterpolationSpace.cartesian,
-                config.cmd_goal_time,
+                CMD_GOAL_TIME,
                 False,
             )
 

@@ -63,7 +63,7 @@ prev_buttons = {}
 
 print("Waiting for VR data... Press A to start, B to exit.")
 
-send_period = 1.0 / config.send_rate_hz
+send_period = 1.0 / SEND_RATE_HZ
 last_send = time.monotonic()
 
 
@@ -83,23 +83,21 @@ while running:
         continue
 
     # Button handling
-    if button_pressed(frame.buttons, "a"):
+    if button_pressed(frame.buttons, vr.ButtonNames.A):
         teleop_active = not teleop_active
         offset_captured = False
         print("Teleop ENGAGED" if teleop_active else "Teleop PAUSED")
 
-    if button_pressed(frame.buttons, "b"):
+    if button_pressed(frame.buttons, vr.ButtonNames.B):
         print("Exit requested via B button")
         break
 
     # Grippers
-    right_trig = frame.buttons.get("rightTrigger", 0.0)
-    if isinstance(right_trig, float):
-        right_driver.set_gripper_position(right_trig * GRIPPER_MAX_M, 0.0, False)
+    right_trig = frame.get_analog(vr.ButtonNames.RightTrigger)
+    right_driver.set_gripper_position(right_trig * GRIPPER_MAX_M, 0.0, False)
 
-    left_trig = frame.buttons.get("leftTrigger", 0.0)
-    if isinstance(left_trig, float):
-        left_driver.set_gripper_position(left_trig * GRIPPER_MAX_M, 0.0, False)
+    left_trig = frame.get_analog(vr.ButtonNames.LeftTrigger)
+    left_driver.set_gripper_position(left_trig * GRIPPER_MAX_M, 0.0, False)
 
     if not teleop_active:
         continue

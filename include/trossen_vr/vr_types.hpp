@@ -25,11 +25,46 @@ struct ControllerPose {
     Eigen::Quaterniond rotation = Eigen::Quaterniond::Identity();
 };
 
+// Standard button names from Unity VR controller mapping.
+namespace ButtonNames {
+    // Digital buttons (bool values)
+    constexpr const char* A = "a";
+    constexpr const char* B = "b";
+    constexpr const char* X = "x";
+    constexpr const char* Y = "y";
+
+    // Analog triggers and grips (double values 0.0-1.0)
+    constexpr const char* RightTrigger = "rightTrigger";
+    constexpr const char* LeftTrigger = "leftTrigger";
+    constexpr const char* RightGrip = "rightGrip";
+    constexpr const char* LeftGrip = "leftGrip";
+}
+
 // Full VR frame: both controller poses + generic button map
 struct VRFrame {
     std::optional<ControllerPose> right;
     std::optional<ControllerPose> left;
     std::unordered_map<std::string, ButtonValue> buttons;
+
+    // Helper: Get digital button state (returns false if not found or wrong type)
+    bool get_button(const std::string& name) const {
+        auto it = buttons.find(name);
+        if (it == buttons.end()) return false;
+        if (const bool* val = std::get_if<bool>(&it->second)) {
+            return *val;
+        }
+        return false;
+    }
+
+    // Helper: Get analog value (returns 0.0 if not found or wrong type)
+    double get_analog(const std::string& name) const {
+        auto it = buttons.find(name);
+        if (it == buttons.end()) return 0.0;
+        if (const double* val = std::get_if<double>(&it->second)) {
+            return *val;
+        }
+        return 0.0;
+    }
 };
 
 // JSON conversion functions
