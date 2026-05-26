@@ -1,6 +1,7 @@
 #ifndef TROSSEN_VR_VR_TYPES_HPP
 #define TROSSEN_VR_VR_TYPES_HPP
 
+#include <iostream>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -30,6 +31,34 @@ struct VRFrame {
     std::optional<ControllerPose> left;
     std::unordered_map<std::string, ButtonValue> buttons;
 };
+
+// JSON conversion functions
+// Convert JSON object {x, y, z} to Eigen::Vector3d
+inline void from_json(const nlohmann::json& j, Eigen::Vector3d& v) {
+    v.x() = j.at("x").get<double>();
+    v.y() = j.at("y").get<double>();
+    v.z() = j.at("z").get<double>();
+}
+
+// Convert JSON object {w, x, y, z} to Eigen::Quaterniond
+inline void from_json(const nlohmann::json& j, Eigen::Quaterniond& q) {
+    q.w() = j.at("w").get<double>();
+    q.x() = j.at("x").get<double>();
+    q.y() = j.at("y").get<double>();
+    q.z() = j.at("z").get<double>();
+}
+
+// Convert JSON button object to button state map
+inline void from_json(const nlohmann::json& j,
+                     std::unordered_map<std::string, trossen_vr::ButtonValue>& buttons) {
+    for (const auto& [key, val] : j.items()) {
+        if (val.is_boolean()) {
+            buttons[key] = val.get<bool>();
+        } else if (val.is_number()) {
+            buttons[key] = val.get<double>();
+        }
+    }
+}
 
 // Convert a 6-vector to a 4x4 homogeneous transform
 inline Eigen::Matrix4d vec6_to_T(const Vec6& v6) {
@@ -89,40 +118,37 @@ inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
 inline VRFrame parse_vr_frame(const nlohmann::json& data) {
     VRFrame frame;
 
+    // Parse right controller
     try {
         if (data.contains("rightPosition") && data.contains("rightRotation")) {
-            const auto& rp = data["rightPosition"];
-            const auto& rr = data["rightRotation"];
-            if (rp.is_object() && rr.is_object()) {
-                ControllerPose pose;
-                pose.position = Eigen::Vector3d(rp["x"], rp["y"], rp["z"]);
-                pose.rotation = Eigen::Quaterniond(rr["w"], rr["x"], rr["y"], rr["z"]);
-                frame.right = pose;
-            }
+            ControllerPose pose;
+            from_json(data["rightPosition"], pose.position);
+            from_json(data["rightRotation"], pose.rotation);
+            frame.right = pose;
         }
-    } catch (const nlohmann::json::exception&) {}
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "[VR] Failed to parse right controller: " << e.what() << std::endl;
+    }
 
+    // Parse left controller
     try {
         if (data.contains("leftPosition") && data.contains("leftRotation")) {
-            const auto& lp = data["leftPosition"];
-            const auto& lr = data["leftRotation"];
-            if (lp.is_object() && lr.is_object()) {
-                ControllerPose pose;
-                pose.position = Eigen::Vector3d(lp["x"], lp["y"], lp["z"]);
-                pose.rotation = Eigen::Quaterniond(lr["w"], lr["x"], lr["y"], lr["z"]);
-                frame.left = pose;
-            }
+            ControllerPose pose;
+            from_json(data["leftPosition"], pose.position);
+            from_json(data["leftRotation"], pose.rotation);
+            frame.left = pose;
         }
-    } catch (const nlohmann::json::exception&) {}
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "[VR] Failed to parse left controller: " << e.what() << std::endl;
+    }
 
-    if (data.contains("buttons") && data["buttons"].is_object()) {
-        for (auto& [key, val] : data["buttons"].items()) {
-            if (val.is_boolean()) {
-                frame.buttons[key] = val.get<bool>();
-            } else if (val.is_number()) {
-                frame.buttons[key] = val.get<double>();
-            }
+    // Parse button states
+    try {
+        if (data.contains("buttons") && data["buttons"].is_object()) {
+            from_json(data["buttons"], frame.buttons);
         }
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "[VR] Failed to parse buttons: " << e.what() << std::endl;
     }
 
     return frame;

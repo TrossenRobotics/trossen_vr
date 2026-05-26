@@ -90,8 +90,8 @@ void UDPReceiver::run() {
             auto frame = parse_vr_frame(data);
             std::lock_guard<std::mutex> lock(frame_mutex_);
             latest_frame_ = std::move(frame);
-        } catch (const nlohmann::json::exception&) {
-            // Skip malformed or unexpected packets silently
+        } catch (const nlohmann::json::exception& e) {
+            std::cerr << "[VR] Skipping malformed UDP packet: " << e.what() << std::endl;
         }
     }
 }
