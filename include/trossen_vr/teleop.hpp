@@ -1,10 +1,11 @@
-#pragma once
-
-#include "trossen_vr/vr_types.hpp"
+#ifndef TROSSEN_VR_TELEOP_HPP
+#define TROSSEN_VR_TELEOP_HPP
 
 #include <functional>
 #include <string>
 #include <unordered_map>
+
+#include "trossen_vr/vr_types.hpp"
 
 namespace trossen_vr {
 
@@ -43,3 +44,5 @@ private:
 };
 
 } // namespace trossen_vr
+
+#endif // TROSSEN_VR_TELEOP_HPP

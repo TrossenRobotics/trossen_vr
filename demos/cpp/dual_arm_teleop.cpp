@@ -1,15 +1,17 @@
-#include <iostream>
 #include <cmath>
 #include <csignal>
-#include <chrono>
+
 #include <array>
+#include <chrono>
+#include <iostream>
 #include <thread>
 #include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
-#include "trossen_vr/vr_types.hpp"
+
 #include "trossen_vr/network_manager.hpp"
 #include "trossen_vr/teleop.hpp"
+#include "trossen_vr/vr_types.hpp"
 
 static volatile std::sig_atomic_t running = 1;
 

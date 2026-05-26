@@ -1,11 +1,13 @@
-#pragma once
+#ifndef TROSSEN_VR_VR_TYPES_HPP
+#define TROSSEN_VR_VR_TYPES_HPP
 
-#include <Eigen/Dense>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <variant>
+
+#include <Eigen/Dense>
+#include <nlohmann/json.hpp>
 
 namespace trossen_vr {
 
@@ -127,3 +129,5 @@ inline VRFrame parse_vr_frame(const nlohmann::json& data) {
 }
 
 } // namespace trossen_vr
+
+#endif // TROSSEN_VR_VR_TYPES_HPP

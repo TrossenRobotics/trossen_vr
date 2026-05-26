@@ -1,12 +1,15 @@
-#pragma once
+#ifndef TROSSEN_VR_NETWORK_MANAGER_HPP
+#define TROSSEN_VR_NETWORK_MANAGER_HPP
 
-#include "trossen_vr/vr_types.hpp"
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
+
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <thread>
+
+#include "trossen_vr/vr_types.hpp"
 
 namespace trossen_vr {
 
@@ -50,3 +53,5 @@ private:
 };
 
 } // namespace trossen_vr
+
+#endif // TROSSEN_VR_NETWORK_MANAGER_HPP

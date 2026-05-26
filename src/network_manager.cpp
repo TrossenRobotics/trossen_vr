@@ -1,12 +1,14 @@
 #include "trossen_vr/network_manager.hpp"
 
+#include <netinet/in.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include <cstring>
+
 #include <iostream>
 #include <stdexcept>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <poll.h>
-#include <unistd.h>
 
 namespace trossen_vr {
 

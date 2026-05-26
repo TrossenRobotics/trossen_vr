@@ -1,11 +1,11 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
-#include "trossen_vr/vr_types.hpp"
 #include "trossen_vr/network_manager.hpp"
 #include "trossen_vr/teleop.hpp"
+#include "trossen_vr/vr_types.hpp"
 
 namespace py = pybind11;
 
