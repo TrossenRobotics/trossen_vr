@@ -29,9 +29,9 @@ target_link_libraries(trossen_vr_lib PUBLIC
   Threads::Threads
 )
 
-# Dual-arm teleop (event-driven)
-add_executable(dual_arm_teleop demos/cpp/dual_arm_teleop.cpp)
-target_link_libraries(dual_arm_teleop PRIVATE
+# Event-driven teleop demo
+add_executable(event_driven_teleop demos/cpp/event_driven_teleop.cpp)
+target_link_libraries(event_driven_teleop PRIVATE
   trossen_vr_lib
   libtrossen_arm
 )
@@ -45,12 +45,15 @@ target_link_libraries(manual_polling_teleop PRIVATE
 
 # Python bindings
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
-if(NOT pybind11_DIR)
-  execute_process(
-    COMMAND ${Python_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
-    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+  COMMAND ${Python_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
+  OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE pybind11_RESULT
+)
+if(NOT pybind11_RESULT EQUAL 0)
+  message(FATAL_ERROR "Failed to find pybind11. Make sure dependencies are installed: uv sync")
 endif()
-find_package(pybind11 CONFIG REQUIRED)
+find_package(pybind11 CONFIG REQUIRED PATHS ${pybind11_DIR} NO_DEFAULT_PATH)
 pybind11_add_module(trossen_vr MODULE src/bindings.cpp)
 target_link_libraries(trossen_vr PRIVATE trossen_vr_lib)
 

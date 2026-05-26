@@ -15,6 +15,8 @@ namespace trossen_vr {
  * Register callback handlers for button presses, analog inputs, and controller poses.
  * Digital buttons use rising-edge detection (fire once per press).
  * Analog inputs and poses fire on every dispatch() call.
+ *
+ * @note Handler registration is not thread-safe - set all handlers before calling dispatch()
  */
 class Teleop {
 public:

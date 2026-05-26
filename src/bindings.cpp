@@ -62,29 +62,29 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def_readwrite("buffer_size", &trossen_vr::ReceiverConfig::buffer_size,
             "UDP receive buffer size in bytes (default: 2048)");
 
-    // UDPReceiver
-    py::class_<trossen_vr::UDPReceiver>(m, "UDPReceiver",
-        "UDP receiver for VR controller data\\n\\n"
-        "Runs a background thread that continuously receives UDP packets and\\n"
-        "maintains the latest VR frame. Thread-safe access via latest_frame().")
+    // NetworkManager
+    py::class_<trossen_vr::NetworkManager>(m, "NetworkManager",
+        "Network manager for VR controller data\n\n"
+        "Runs a background thread that continuously receives UDP packets and maintains\n"
+        "the latest VR frame. Thread-safe access via latest_frame().")
         .def(py::init<const trossen_vr::ReceiverConfig&>(),
              py::arg("config") = trossen_vr::ReceiverConfig{},
-             "Construct UDP receiver\\n\\n"
-             "Args:\\n"
+             "Construct network manager\n\n"
+             "Args:\n"
              "    config: Receiver configuration (port and buffer size)")
-        .def("start", &trossen_vr::UDPReceiver::start,
+        .def("start", &trossen_vr::NetworkManager::start,
             "Start receiving VR data on background thread\\n\\n"
             "Binds to the configured UDP port and starts packet reception.\\n"
             "Raises RuntimeError if socket creation or binding fails.")
-        .def("stop", &trossen_vr::UDPReceiver::stop,
-            "Stop receiving and shutdown background thread\\n\\n"
+        .def("stop", &trossen_vr::NetworkManager::stop,
+            "Stop receiving and shutdown background thread\n\n"
             "Safe to call multiple times.")
-        .def("latest_frame", &trossen_vr::UDPReceiver::latest_frame,
+        .def("latest_frame", &trossen_vr::NetworkManager::latest_frame,
             "Get the most recent VR frame\\n\\n"
             "Thread-safe. Returns None if no frame received yet.\\n\\n"
             "Returns:\\n"
             "    VRFrame or None: Latest VR frame")
-        .def("is_running", &trossen_vr::UDPReceiver::is_running,
+        .def("is_running", &trossen_vr::NetworkManager::is_running,
             "Check if receiver thread is running\\n\\n"
             "Returns:\\n"
             "    bool: True if background thread is active");
@@ -94,7 +94,8 @@ PYBIND11_MODULE(trossen_vr, m) {
         "Event-driven VR teleoperation dispatcher\\n\\n"
         "Register callback handlers for button presses, analog inputs, and controller poses.\\n"
         "Digital buttons use rising-edge detection (fire once per press).\\n"
-        "Analog inputs and poses fire on every dispatch() call.")
+        "Analog inputs and poses fire on every dispatch() call.\n\n"
+        "Note: Handler registration is not thread-safe - set all handlers before calling dispatch()")
         .def(py::init<>())
         .def("on_button", &trossen_vr::Teleop::on_button,
             py::arg("name"), py::arg("handler"),

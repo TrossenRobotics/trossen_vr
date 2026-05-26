@@ -13,7 +13,7 @@
 
 namespace trossen_vr {
 
-UDPReceiver::UDPReceiver(const ReceiverConfig& config)
+NetworkManager::NetworkManager(const ReceiverConfig& config)
     : buffer_(config.buffer_size) {
 
     sockfd_ = socket(AF_INET, SOCK_DGRAM, 0);
@@ -34,20 +34,20 @@ UDPReceiver::UDPReceiver(const ReceiverConfig& config)
     }
 }
 
-UDPReceiver::~UDPReceiver() {
+NetworkManager::~NetworkManager() {
     stop();
     if (sockfd_ >= 0) {
         close(sockfd_);
     }
 }
 
-void UDPReceiver::start() {
+void NetworkManager::start() {
     if (running_) return;
     running_ = true;
-    thread_ = std::thread(&UDPReceiver::run, this);
+    thread_ = std::thread(&NetworkManager::run, this);
 }
 
-void UDPReceiver::stop() {
+void NetworkManager::stop() {
     running_ = false;
     if (thread_.joinable()) {
         // Unblock the poll() call by shutting down the socket read side
@@ -56,16 +56,16 @@ void UDPReceiver::stop() {
     }
 }
 
-std::optional<VRFrame> UDPReceiver::latest_frame() const {
+std::optional<VRFrame> NetworkManager::latest_frame() const {
     std::lock_guard<std::mutex> lock(frame_mutex_);
     return latest_frame_;
 }
 
-bool UDPReceiver::is_running() const noexcept {
+bool NetworkManager::is_running() const noexcept {
     return running_;
 }
 
-void UDPReceiver::run() {
+void NetworkManager::run() {
     pollfd pfd{};
     pfd.fd = sockfd_;
     pfd.events = POLLIN;

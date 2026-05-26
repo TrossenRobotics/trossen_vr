@@ -24,25 +24,25 @@ struct ReceiverConfig {
 };
 
 /**
- * @brief UDP receiver for VR controller data
+ * @brief Network manager for VR controller data
  *
  * Runs a background thread that continuously receives UDP packets and maintains
  * the latest VR frame. Thread-safe access via latest_frame().
  */
-class UDPReceiver {
+class NetworkManager {
 public:
     /**
-     * @brief Construct UDP receiver
+     * @brief Construct network manager
      *
      * @param config Receiver configuration (port and buffer size)
      */
-    explicit UDPReceiver(const ReceiverConfig& config = {});
+    explicit NetworkManager(const ReceiverConfig& config = {});
 
-    /// @brief Destroy receiver and stop background thread
-    ~UDPReceiver();
+    /// @brief Destroy manager and stop background thread
+    ~NetworkManager();
 
-    UDPReceiver(const UDPReceiver&) = delete;
-    UDPReceiver& operator=(const UDPReceiver&) = delete;
+    NetworkManager(const NetworkManager&) = delete;
+    NetworkManager& operator=(const NetworkManager&) = delete;
 
     /**
      * @brief Start receiving VR data on background thread

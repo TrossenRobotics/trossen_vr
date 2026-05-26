@@ -51,7 +51,7 @@ left_driver.set_arm_positions(START_POSE, 2.0, True)
 # Network
 net_config = vr.ReceiverConfig()
 net_config.port = 9000
-receiver = vr.UDPReceiver(net_config)
+receiver = vr.NetworkManager(net_config)
 receiver.start()
 
 # Teleop state
@@ -111,7 +111,7 @@ teleop.on_analog(vr.ButtonNames.LeftTrigger, handle_left_trigger)
 teleop.on_right_pose(handle_right_pose)
 teleop.on_left_pose(handle_left_pose)
 
-print("Waiting for VR data... Press A to engage teleop.")
+print("Waiting for VR data... Press A to engage, B to exit")
 
 send_period = 1.0 / SEND_RATE_HZ
 last_send = time.monotonic()

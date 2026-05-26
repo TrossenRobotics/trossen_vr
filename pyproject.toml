@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 
 dependencies = [
     "numpy>=2.0",
+    "pre-commit>=4.6.0",
     "pybind11>=2.11",
     "trossen-arm>=1.9.0",
 ]

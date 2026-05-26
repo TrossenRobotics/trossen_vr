@@ -34,13 +34,11 @@ void engage_arm(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver) {
     state.T_offset = trossen_vr::vec6_to_T(robot_start)
                    * trossen_vr::vec6_to_T(state.last_vr_vec6).inverse();
     state.engaged = true;
-    std::cout << "Teleop ENGAGED" << std::endl;
 }
 
 void disengage_arm(ArmTeleopState& state) {
     if (!state.engaged) return;
     state.engaged = false;
-    std::cout << "Teleop PAUSED" << std::endl;
 }
 
 void send_arm_command(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver,
@@ -93,12 +91,12 @@ int main(int argc, char** argv) {
     );
     left_driver.set_all_modes(trossen_arm::Mode::position);
 
-    std::cout << "Moving both arms to start position" << std::endl;
+    std::cout << "Moving arms to start position" << std::endl;
     right_driver.set_arm_positions(START_POSE, 2.0, true);
     left_driver.set_arm_positions(START_POSE, 2.0, true);
 
     // --- Network setup ---
-    trossen_vr::UDPReceiver receiver(net_config);
+    trossen_vr::NetworkManager receiver(net_config);
     receiver.start();
 
     // --- Arm state ---
@@ -111,9 +109,11 @@ int main(int argc, char** argv) {
         if (!right_state.engaged && !left_state.engaged) {
             engage_arm(right_state, right_driver);
             engage_arm(left_state, left_driver);
+            std::cout << "Teleop ENGAGED" << std::endl;
         } else {
             disengage_arm(right_state);
             disengage_arm(left_state);
+            std::cout << "Teleop PAUSED" << std::endl;
         }
     });
 
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
     const double send_period = 1.0 / send_rate_hz;
     auto last_send_time = std::chrono::steady_clock::now();
 
-    std::cout << "Waiting for VR data... Press A to engage teleop." << std::endl;
+    std::cout << "Waiting for VR data... Press A to engage, B to exit" << std::endl;
 
     while (running) {
         auto frame = receiver.latest_frame();

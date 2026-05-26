@@ -48,10 +48,10 @@ namespace ButtonNames {
     /// @brief Left index trigger (analog 0.0-1.0)
     constexpr const char* LeftTrigger = "leftTrigger";
 
-    /// @brief Right grip button (analog 0.0-1.0)
+    /// @brief Right grip (analog 0.0-1.0)
     constexpr const char* RightGrip = "rightGrip";
 
-    /// @brief Left grip button (analog 0.0-1.0)
+    /// @brief Left grip (analog 0.0-1.0)
     constexpr const char* LeftGrip = "leftGrip";
 }
 
