@@ -45,21 +45,21 @@ cmake --install build
 
 **C++ demos** are in `demos/cpp/`:
 
-- `dual_arm_teleop` — event-driven dual-arm teleop using `Teleop` callbacks. Press **A** to engage/disengage teleop, **B** to exit. Triggers control the grippers.
-- `manual_polling_teleop` — manual frame polling with inline edge detection. Same controls as above but uses explicit polling instead of callbacks.
+- `event_driven_teleop` — Event-driven dual-arm teleop using callback handlers. Press **A** to engage/disengage, **B** to exit. Triggers control grippers.
+- `manual_polling_teleop` — Manual frame polling with inline edge detection. Same controls, different implementation pattern.
 
 ```bash
-./build/dual_arm_teleop
+./build/event_driven_teleop
 ./build/manual_polling_teleop
 ```
 
 **Python demos** are in `demos/python/`:
 
-- `dual_arm_teleop.py` — Python version of the event-driven demo.
+- `event_driven_teleop.py` — Python version of the event-driven demo.
 - `manual_polling_teleop.py` — Python version of the manual polling demo.
 
 ```bash
 source .venv/bin/activate
-python demos/python/dual_arm_teleop.py
+python demos/python/event_driven_teleop.py
 python demos/python/manual_polling_teleop.py
 ```
