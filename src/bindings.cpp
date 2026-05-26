@@ -47,15 +47,6 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def("latest_frame", &trossen_vr::UDPReceiver::latest_frame)
         .def("is_running", &trossen_vr::UDPReceiver::is_running);
 
-    // TeleopConfig
-    py::class_<trossen_vr::TeleopConfig>(m, "TeleopConfig")
-        .def(py::init<>())
-        .def_readwrite("right_arm_ip", &trossen_vr::TeleopConfig::right_arm_ip)
-        .def_readwrite("left_arm_ip", &trossen_vr::TeleopConfig::left_arm_ip)
-        .def_readwrite("send_rate_hz", &trossen_vr::TeleopConfig::send_rate_hz)
-        .def_readwrite("gripper_max_m", &trossen_vr::TeleopConfig::gripper_max_m)
-        .def_readwrite("cmd_goal_time", &trossen_vr::TeleopConfig::cmd_goal_time);
-
     // Teleop
     py::class_<trossen_vr::Teleop>(m, "Teleop")
         .def(py::init<>())

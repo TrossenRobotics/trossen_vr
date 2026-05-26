@@ -63,12 +63,11 @@ int main(int argc, char** argv) {
     std::signal(SIGTERM, signal_handler);
 
     // --- Configuration ---
-    trossen_vr::TeleopConfig config;
-    config.right_arm_ip = "192.168.1.2";
-    config.left_arm_ip = "192.168.1.3";
-    config.send_rate_hz = 100.0;
-    config.gripper_max_m = 0.04;
-    config.cmd_goal_time = 0.15;
+    const std::string right_arm_ip = "192.168.1.2";
+    const std::string left_arm_ip = "192.168.1.3";
+    const double send_rate_hz = 100.0;
+    const double gripper_max_m = 0.04;
+    const double cmd_goal_time = 0.15;
 
     trossen_vr::ReceiverConfig net_config;
     net_config.port = 9000;
@@ -83,14 +82,14 @@ int main(int argc, char** argv) {
     right_driver.configure(
         trossen_arm::Model::wxai_v0,
         trossen_arm::StandardEndEffector::wxai_v0_leader,
-        config.right_arm_ip, false
+        right_arm_ip, false
     );
     right_driver.set_all_modes(trossen_arm::Mode::position);
 
     left_driver.configure(
         trossen_arm::Model::wxai_v0,
         trossen_arm::StandardEndEffector::wxai_v0_leader,
-        config.left_arm_ip, false
+        left_arm_ip, false
     );
     left_driver.set_all_modes(trossen_arm::Mode::position);
 
@@ -124,11 +123,11 @@ int main(int argc, char** argv) {
     });
 
     teleop.on_analog("rightTrigger", [&](double val) {
-        right_driver.set_gripper_position(val * config.gripper_max_m, 0.0, false);
+        right_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
     });
 
     teleop.on_analog("leftTrigger", [&](double val) {
-        left_driver.set_gripper_position(val * config.gripper_max_m, 0.0, false);
+        left_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
     });
 
     teleop.on_right_pose([&](const trossen_vr::ControllerPose& pose) {
@@ -142,7 +141,7 @@ int main(int argc, char** argv) {
     });
 
     // --- Main loop ---
-    const double send_period = 1.0 / config.send_rate_hz;
+    const double send_period = 1.0 / send_rate_hz;
     auto last_send_time = std::chrono::steady_clock::now();
 
     std::cout << "Waiting for VR data... Press A to engage teleop." << std::endl;
@@ -162,8 +161,8 @@ int main(int argc, char** argv) {
         std::chrono::duration<double> elapsed = now - last_send_time;
         if (elapsed.count() >= send_period) {
             last_send_time = now;
-            send_arm_command(right_state, right_driver, config.cmd_goal_time);
-            send_arm_command(left_state, left_driver, config.cmd_goal_time);
+            send_arm_command(right_state, right_driver, cmd_goal_time);
+            send_arm_command(left_state, left_driver, cmd_goal_time);
         }
     }
 

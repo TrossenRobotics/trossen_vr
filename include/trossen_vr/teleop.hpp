@@ -9,14 +9,6 @@
 
 namespace trossen_vr {
 
-struct TeleopConfig {
-    std::string right_arm_ip = "192.168.1.2";
-    std::string left_arm_ip = "192.168.1.3";
-    double send_rate_hz = 100.0;
-    double gripper_max_m = 0.04;
-    double cmd_goal_time = 0.15;
-};
-
 // Event-driven teleop dispatcher.
 // Register handlers for buttons (rising-edge for bools, always-fire for analog)
 // and poses, then call dispatch() each frame.

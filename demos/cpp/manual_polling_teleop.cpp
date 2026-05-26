@@ -50,12 +50,11 @@ int main(int argc, char** argv) {
     std::signal(SIGTERM, signal_handler);
 
     // --- Configuration ---
-    trossen_vr::TeleopConfig config;
-    config.right_arm_ip = "192.168.1.2";
-    config.left_arm_ip = "192.168.1.3";
-    config.send_rate_hz = 100.0;
-    config.gripper_max_m = 0.04;
-    config.cmd_goal_time = 0.15;
+    const std::string right_arm_ip = "192.168.1.2";
+    const std::string left_arm_ip = "192.168.1.3";
+    const double send_rate_hz = 100.0;
+    const double gripper_max_m = 0.04;
+    const double cmd_goal_time = 0.15;
 
     trossen_vr::ReceiverConfig net_config;
     net_config.port = 9000;
@@ -70,14 +69,14 @@ int main(int argc, char** argv) {
     right_driver.configure(
         trossen_arm::Model::wxai_v0,
         trossen_arm::StandardEndEffector::wxai_v0_leader,
-        config.right_arm_ip, false
+        right_arm_ip, false
     );
     right_driver.set_all_modes(trossen_arm::Mode::position);
 
     left_driver.configure(
         trossen_arm::Model::wxai_v0,
         trossen_arm::StandardEndEffector::wxai_v0_leader,
-        config.left_arm_ip, false
+        left_arm_ip, false
     );
     left_driver.set_all_modes(trossen_arm::Mode::position);
 
@@ -97,7 +96,7 @@ int main(int argc, char** argv) {
 
     EdgeDetector edges;
     auto last_send_time = std::chrono::steady_clock::now();
-    const double send_period = 1.0 / config.send_rate_hz;
+    const double send_period = 1.0 / send_rate_hz;
 
     std::cout << "Waiting for VR data... Press A to start, B to exit." << std::endl;
 
@@ -125,10 +124,10 @@ int main(int argc, char** argv) {
         }
 
         double right_trig = edges.analog(frame, "rightTrigger");
-        right_driver.set_gripper_position(right_trig * config.gripper_max_m, 0.0, false);
+        right_driver.set_gripper_position(right_trig * gripper_max_m, 0.0, false);
 
         double left_trig = edges.analog(frame, "leftTrigger");
-        left_driver.set_gripper_position(left_trig * config.gripper_max_m, 0.0, false);
+        left_driver.set_gripper_position(left_trig * gripper_max_m, 0.0, false);
 
         if (!teleop_active) continue;
 
@@ -174,7 +173,7 @@ int main(int argc, char** argv) {
             std::array<double, 6> goal{};
             Eigen::VectorXd::Map(goal.data(), 6) = cmd;
             right_driver.set_cartesian_positions(
-                goal, trossen_arm::InterpolationSpace::cartesian, config.cmd_goal_time, false);
+                goal, trossen_arm::InterpolationSpace::cartesian, cmd_goal_time, false);
         }
 
         if (left_valid) {
@@ -183,7 +182,7 @@ int main(int argc, char** argv) {
             std::array<double, 6> goal{};
             Eigen::VectorXd::Map(goal.data(), 6) = cmd;
             left_driver.set_cartesian_positions(
-                goal, trossen_arm::InterpolationSpace::cartesian, config.cmd_goal_time, false);
+                goal, trossen_arm::InterpolationSpace::cartesian, cmd_goal_time, false);
         }
     }
 

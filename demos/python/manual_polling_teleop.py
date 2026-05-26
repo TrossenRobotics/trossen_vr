@@ -19,19 +19,18 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-
-config = vr.TeleopConfig()
-config.right_arm_ip = "192.168.1.2"
-config.left_arm_ip = "192.168.1.3"
-config.send_rate_hz = 100.0
-config.gripper_max_m = 0.04
-config.cmd_goal_time = 0.15
+# Configuration
+RIGHT_ARM_IP = "192.168.1.2"
+LEFT_ARM_IP = "192.168.1.3"
+SEND_RATE_HZ = 100.0
+GRIPPER_MAX_M = 0.04
+CMD_GOAL_TIME = 0.15
 
 right_driver = trossen_arm.TrossenArmDriver()
 right_driver.configure(
     trossen_arm.Model.wxai_v0,
     trossen_arm.StandardEndEffector.wxai_v0_leader,
-    config.right_arm_ip,
+    RIGHT_ARM_IP,
     False,
 )
 right_driver.set_all_modes(trossen_arm.Mode.position)
@@ -40,7 +39,7 @@ left_driver = trossen_arm.TrossenArmDriver()
 left_driver.configure(
     trossen_arm.Model.wxai_v0,
     trossen_arm.StandardEndEffector.wxai_v0_leader,
-    config.left_arm_ip,
+    LEFT_ARM_IP,
     False,
 )
 left_driver.set_all_modes(trossen_arm.Mode.position)
@@ -96,11 +95,11 @@ while running:
     # Grippers
     right_trig = frame.buttons.get("rightTrigger", 0.0)
     if isinstance(right_trig, float):
-        right_driver.set_gripper_position(right_trig * config.gripper_max_m, 0.0, False)
+        right_driver.set_gripper_position(right_trig * GRIPPER_MAX_M, 0.0, False)
 
     left_trig = frame.buttons.get("leftTrigger", 0.0)
     if isinstance(left_trig, float):
-        left_driver.set_gripper_position(left_trig * config.gripper_max_m, 0.0, False)
+        left_driver.set_gripper_position(left_trig * GRIPPER_MAX_M, 0.0, False)
 
     if not teleop_active:
         continue
@@ -142,7 +141,7 @@ while running:
         right_driver.set_cartesian_positions(
             vr.T_to_vec6(T_cmd).tolist(),
             trossen_arm.InterpolationSpace.cartesian,
-            config.cmd_goal_time,
+            CMD_GOAL_TIME,
             False,
         )
 
@@ -151,7 +150,7 @@ while running:
         left_driver.set_cartesian_positions(
             vr.T_to_vec6(T_cmd).tolist(),
             trossen_arm.InterpolationSpace.cartesian,
-            config.cmd_goal_time,
+            CMD_GOAL_TIME,
             False,
         )
 
