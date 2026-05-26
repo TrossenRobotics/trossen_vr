@@ -14,29 +14,66 @@
 
 namespace trossen_vr {
 
+/// @brief UDP receiver configuration
 struct ReceiverConfig {
+    /// @brief UDP port to listen on (default: 9000)
     uint16_t port = 9000;
-    size_t buffer_size = 2048;  // UDP receive buffer size in bytes
+
+    /// @brief UDP receive buffer size in bytes (default: 2048)
+    size_t buffer_size = 2048;
 };
 
-// UDP receiver that always holds the newest VR frame.
-// Runs a background thread that drains the socket and keeps only the latest packet.
+/**
+ * @brief UDP receiver for VR controller data
+ *
+ * Runs a background thread that continuously receives UDP packets and maintains
+ * the latest VR frame. Thread-safe access via latest_frame().
+ */
 class UDPReceiver {
 public:
+    /**
+     * @brief Construct UDP receiver
+     *
+     * @param config Receiver configuration (port and buffer size)
+     */
     explicit UDPReceiver(const ReceiverConfig& config = {});
+
+    /// @brief Destroy receiver and stop background thread
     ~UDPReceiver();
 
     UDPReceiver(const UDPReceiver&) = delete;
     UDPReceiver& operator=(const UDPReceiver&) = delete;
 
+    /**
+     * @brief Start receiving VR data on background thread
+     *
+     * Binds to the configured UDP port and starts packet reception.
+     *
+     * @throws std::runtime_error if socket creation or binding fails
+     */
     void start();
 
+    /**
+     * @brief Stop receiving and shutdown background thread
+     *
+     * Safe to call multiple times.
+     */
     void stop();
 
-    // Get the latest frame (thread-safe).
+    /**
+     * @brief Get the most recent VR frame
+     *
+     * Thread-safe. Returns empty optional if no frame received yet.
+     *
+     * @return Latest VR frame, or empty if none available
+     */
     std::optional<VRFrame> latest_frame() const;
 
-    // Check if the receiver thread is running.
+    /**
+     * @brief Check if receiver thread is running
+     *
+     * @return true if background thread is active
+     */
     bool is_running() const noexcept;
 
 private:

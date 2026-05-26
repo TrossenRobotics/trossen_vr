@@ -9,21 +9,70 @@
 
 namespace trossen_vr {
 
-// Event-driven teleop dispatcher.
-// Register handlers for buttons (rising-edge for bools, always-fire for analog)
-// and poses, then call dispatch() each frame.
+/**
+ * @brief Event-driven VR teleoperation dispatcher
+ *
+ * Register callback handlers for button presses, analog inputs, and controller poses.
+ * Digital buttons use rising-edge detection (fire once per press).
+ * Analog inputs and poses fire on every dispatch() call.
+ */
 class Teleop {
 public:
+    /// @brief Handler for controller pose updates
     using PoseHandler = std::function<void(const ControllerPose&)>;
+
+    /// @brief Handler for digital button presses (no arguments)
     using ButtonHandler = std::function<void()>;
+
+    /// @brief Handler for analog inputs (receives value 0.0-1.0)
     using AnalogHandler = std::function<void(double)>;
 
+    /**
+     * @brief Register handler for digital button press
+     *
+     * Handler fires once when button transitions from released to pressed (rising edge).
+     *
+     * @param name Button name (use ButtonNames constants)
+     * @param handler Callback function, called on button press
+     */
     void on_button(const std::string& name, ButtonHandler handler);
+
+    /**
+     * @brief Register handler for analog input
+     *
+     * Handler fires every dispatch() call with current analog value.
+     *
+     * @param name Input name (use ButtonNames constants)
+     * @param handler Callback function, receives value 0.0-1.0
+     */
     void on_analog(const std::string& name, AnalogHandler handler);
+
+    /**
+     * @brief Register handler for right controller pose updates
+     *
+     * Handler fires every dispatch() call when right controller is tracked.
+     *
+     * @param handler Callback function, receives ControllerPose
+     */
     void on_right_pose(PoseHandler handler);
+
+    /**
+     * @brief Register handler for left controller pose updates
+     *
+     * Handler fires every dispatch() call when left controller is tracked.
+     *
+     * @param handler Callback function, receives ControllerPose
+     */
     void on_left_pose(PoseHandler handler);
 
-    // Dispatch a VR frame: detects edges, fires handlers
+    /**
+     * @brief Process VR frame and fire registered handlers
+     *
+     * Detects button state changes and invokes appropriate callbacks.
+     * Safe to call from multiple threads, but handler registration is not thread-safe.
+     *
+     * @param frame VR frame to process
+     */
     void dispatch(const VRFrame& frame);
 
 private:

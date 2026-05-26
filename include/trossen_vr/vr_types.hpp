@@ -12,41 +12,66 @@
 
 namespace trossen_vr {
 
-// Pose represented as 6-vector: [x, y, z, rx, ry, rz]
-// Position in meters, rotation as axis-angle
+/// @brief 6D pose vector: [x, y, z, rx, ry, rz]
+/// Position in meters, rotation as axis-angle in radians
 using Vec6 = Eigen::Matrix<double, 6, 1>;
 
-// A button value is either a bool (digital) or double (analog)
+/// @brief Button value variant - either bool (digital) or double (analog 0.0-1.0)
 using ButtonValue = std::variant<bool, double>;
 
-// Per-hand controller pose (position + rotation only)
+/// @brief VR controller pose (position + orientation)
 struct ControllerPose {
+    /// @brief Position vector in meters (x, y, z)
     Eigen::Vector3d position = Eigen::Vector3d::Zero();
+
+    /// @brief Orientation as quaternion (w, x, y, z)
     Eigen::Quaterniond rotation = Eigen::Quaterniond::Identity();
 };
 
-// Standard button names from Unity VR controller mapping.
+/// @brief Standard button names from Unity VR controller mapping
 namespace ButtonNames {
-    // Digital buttons (bool values)
+    /// @brief Digital button A (bool)
     constexpr const char* A = "a";
+
+    /// @brief Digital button B (bool)
     constexpr const char* B = "b";
+
+    /// @brief Digital button X (bool)
     constexpr const char* X = "x";
+
+    /// @brief Digital button Y (bool)
     constexpr const char* Y = "y";
 
-    // Analog triggers and grips (double values 0.0-1.0)
+    /// @brief Right index trigger (analog 0.0-1.0)
     constexpr const char* RightTrigger = "rightTrigger";
+
+    /// @brief Left index trigger (analog 0.0-1.0)
     constexpr const char* LeftTrigger = "leftTrigger";
+
+    /// @brief Right grip button (analog 0.0-1.0)
     constexpr const char* RightGrip = "rightGrip";
+
+    /// @brief Left grip button (analog 0.0-1.0)
     constexpr const char* LeftGrip = "leftGrip";
 }
 
-// Full VR frame: both controller poses + generic button map
+/// @brief Complete VR frame with controller poses and button states
 struct VRFrame {
+    /// @brief Right controller pose (empty if not tracked)
     std::optional<ControllerPose> right;
+
+    /// @brief Left controller pose (empty if not tracked)
     std::optional<ControllerPose> left;
+
+    /// @brief Button states map (name -> ButtonValue)
     std::unordered_map<std::string, ButtonValue> buttons;
 
-    // Helper: Get digital button state (returns false if not found or wrong type)
+    /**
+     * @brief Get digital button state
+     *
+     * @param name Button name (use ButtonNames constants)
+     * @return Button pressed state, false if not found or wrong type
+     */
     bool get_button(const std::string& name) const {
         auto it = buttons.find(name);
         if (it == buttons.end()) return false;
@@ -56,7 +81,12 @@ struct VRFrame {
         return false;
     }
 
-    // Helper: Get analog value (returns 0.0 if not found or wrong type)
+    /**
+     * @brief Get analog input value
+     *
+     * @param name Input name (use ButtonNames constants)
+     * @return Analog value 0.0-1.0, or 0.0 if not found or wrong type
+     */
     double get_analog(const std::string& name) const {
         auto it = buttons.find(name);
         if (it == buttons.end()) return 0.0;
@@ -67,15 +97,24 @@ struct VRFrame {
     }
 };
 
-// JSON conversion functions
-// Convert JSON object {x, y, z} to Eigen::Vector3d
+/**
+ * @brief Convert JSON {x, y, z} to Eigen::Vector3d
+ *
+ * @param j JSON object with x, y, z fields
+ * @param v Output vector
+ */
 inline void from_json(const nlohmann::json& j, Eigen::Vector3d& v) {
     v.x() = j.at("x").get<double>();
     v.y() = j.at("y").get<double>();
     v.z() = j.at("z").get<double>();
 }
 
-// Convert JSON object {w, x, y, z} to Eigen::Quaterniond
+/**
+ * @brief Convert JSON {w, x, y, z} to Eigen::Quaterniond
+ *
+ * @param j JSON object with w, x, y, z fields
+ * @param q Output quaternion
+ */
 inline void from_json(const nlohmann::json& j, Eigen::Quaterniond& q) {
     q.w() = j.at("w").get<double>();
     q.x() = j.at("x").get<double>();
@@ -83,7 +122,12 @@ inline void from_json(const nlohmann::json& j, Eigen::Quaterniond& q) {
     q.z() = j.at("z").get<double>();
 }
 
-// Convert JSON button object to button state map
+/**
+ * @brief Convert JSON button object to ButtonValue map
+ *
+ * @param j JSON object with button names as keys
+ * @param buttons Output button state map
+ */
 inline void from_json(const nlohmann::json& j,
                      std::unordered_map<std::string, trossen_vr::ButtonValue>& buttons) {
     for (const auto& [key, val] : j.items()) {
@@ -95,7 +139,12 @@ inline void from_json(const nlohmann::json& j,
     }
 }
 
-// Convert a 6-vector to a 4x4 homogeneous transform
+/**
+ * @brief Convert 6D pose vector to 4x4 homogeneous transform
+ *
+ * @param v6 Pose vector [x, y, z, rx, ry, rz] in meters and radians
+ * @return 4x4 transformation matrix
+ */
 inline Eigen::Matrix4d vec6_to_T(const Vec6& v6) {
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
 
@@ -111,7 +160,12 @@ inline Eigen::Matrix4d vec6_to_T(const Vec6& v6) {
     return T;
 }
 
-// Convert a 4x4 homogeneous transform to a 6-vector
+/**
+ * @brief Convert 4x4 homogeneous transform to 6D pose vector
+ *
+ * @param T 4x4 transformation matrix
+ * @return Pose vector [x, y, z, rx, ry, rz] in meters and radians
+ */
 inline Vec6 T_to_vec6(const Eigen::Matrix4d& T) {
     Vec6 v6;
     v6.head<3>() = T.block<3, 1>(0, 3);
@@ -122,9 +176,15 @@ inline Vec6 T_to_vec6(const Eigen::Matrix4d& T) {
     return v6;
 }
 
-// Convert Unity pose to robot frame
-// Position:  Unity (right, up, forward) to Robot (forward, left, up)
-// Rotation:  axis remapped with same convention
+/**
+ * @brief Convert Unity VR pose to robot coordinate frame
+ *
+ * Transforms from Unity coordinates (right, up, forward) to robot frame (forward, left, up)
+ *
+ * @param pos Position in Unity frame (meters)
+ * @param rot Rotation as quaternion in Unity frame
+ * @return 6D pose in robot frame [x, y, z, rx, ry, rz]
+ */
 inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
                                const Eigen::Quaterniond& rot) {
     Vec6 v6;
@@ -149,7 +209,14 @@ inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
     return v6;
 }
 
-// Parse a full VR frame from JSON sent by the Unity app
+/**
+ * @brief Parse VR frame from JSON data
+ *
+ * Extracts controller poses and button states from Unity VR app UDP packet
+ *
+ * @param data JSON object from Unity app
+ * @return Parsed VR frame
+ */
 inline VRFrame parse_vr_frame(const nlohmann::json& data) {
     VRFrame frame;
 
