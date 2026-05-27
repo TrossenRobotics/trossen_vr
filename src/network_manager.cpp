@@ -21,6 +21,15 @@ NetworkManager::NetworkManager(const ReceiverConfig& config)
         throw std::runtime_error("Socket creation failed: " + std::string(std::strerror(errno)));
     }
 
+    // Allow reuse of the port immediately after the process exits/crashes.
+    // Without this, restarting the program quickly causes "address already in use".
+    int reuse = 1;
+    if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        int opt_errno = errno;
+        close(sockfd_);
+        throw std::runtime_error("setsockopt SO_REUSEADDR failed: " + std::string(std::strerror(opt_errno)));
+    }
+
     sockaddr_in servaddr{};
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = INADDR_ANY;
@@ -98,9 +107,15 @@ void NetworkManager::send_ack() {
     ack["frequency_hz"] = get_message_frequency();
     ack["packet_loss"] = get_packet_loss_rate();
 
+    // Send ACK to the client's IP but on the dedicated ACK port.
+    // The client sends VR data from an ephemeral source port, but listens
+    // for ACKs on a fixed port (ack_port, default 9001).
+    sockaddr_in ack_addr = client_addr_;
+    ack_addr.sin_port = htons(config_.ack_port);
+
     std::string ack_str = ack.dump();
     sendto(sockfd_, ack_str.c_str(), ack_str.size(), 0,
-           reinterpret_cast<const sockaddr*>(&client_addr_), client_addr_len_);
+           reinterpret_cast<const sockaddr*>(&ack_addr), sizeof(ack_addr));
 }
 
 void NetworkManager::update_connection_status() {
@@ -128,8 +143,16 @@ void NetworkManager::update_connection_status() {
         return;
     }
 
-    // Check message frequency
-    double freq = get_message_frequency();
+    // Compute frequency inline — do NOT call get_message_frequency() here
+    // because that method also acquires status_mutex_, causing a deadlock.
+    double freq = 0.0;
+    if (total_messages_received_ >= 2) {
+        auto total_elapsed = std::chrono::duration<double>(now - first_received_time_).count();
+        if (total_elapsed > 0.0) {
+            freq = static_cast<double>(total_messages_received_) / total_elapsed;
+        }
+    }
+
     if (freq > 0.0 && freq < config_.min_frequency_hz) {
         connection_status_ = ConnectionStatus::Degraded;
         return;

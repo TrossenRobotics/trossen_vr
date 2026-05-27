@@ -36,6 +36,10 @@ struct ReceiverConfig {
 
     /// @brief Window size for packet loss tracking (default: 100)
     size_t loss_window = 100;
+
+    /// @brief UDP port to send ACK packets back to the VR app (default: 9001)
+    /// The VR app listens on this port for acknowledgement packets.
+    uint16_t ack_port = 9001;
 };
 
 /**
@@ -128,7 +132,7 @@ private:
     int sockfd_ = -1;
     std::vector<char> buffer_;
     sockaddr_in client_addr_{};
-    socklen_t client_addr_len_ = sizeof(client_addr_);
+    socklen_t client_addr_len_ = 0;  // 0 means no client address received yet
 
     std::thread thread_;
     std::atomic<bool> running_{false};
