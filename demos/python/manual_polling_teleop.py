@@ -61,10 +61,13 @@ T_offset_left = np.eye(4)
 offset_captured = False
 prev_buttons = {}
 
-print("Waiting for VR data... Press A to engage, B to exit")
+print(
+    "Waiting for VR data... Press A to engage (Press A again to pause), Press B to exit"
+)
 
 send_period = 1.0 / SEND_RATE_HZ
 last_send = time.monotonic()
+last_status = vr.ConnectionStatus.Disconnected
 
 
 def button_pressed(buttons, name):
@@ -77,6 +80,21 @@ def button_pressed(buttons, name):
 
 
 while running:
+    # Monitor connection status
+    current_status = receiver.get_connection_status()
+    if current_status != last_status:
+        if current_status == vr.ConnectionStatus.Connecting:
+            print("Connecting...")
+        elif current_status == vr.ConnectionStatus.Connected:
+            print(f"Connection established ({receiver.get_message_frequency():.1f} Hz)")
+        elif current_status == vr.ConnectionStatus.Degraded:
+            print(
+                f"Connection degraded (low frequency: {receiver.get_message_frequency():.1f} Hz)"
+            )
+        elif current_status == vr.ConnectionStatus.Disconnected:
+            print("Connection lost (timeout)")
+        last_status = current_status
+
     frame = receiver.latest_frame()
     if frame is None:
         time.sleep(0.001)

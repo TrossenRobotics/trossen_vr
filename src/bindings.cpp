@@ -12,6 +12,19 @@ namespace py = pybind11;
 PYBIND11_MODULE(trossen_vr, m) {
     m.doc() = "Trossen VR teleoperation library for Meta Quest controllers";
 
+    // ConnectionStatus enum
+    py::enum_<trossen_vr::ConnectionStatus>(m, "ConnectionStatus",
+        "Connection status for VR data stream")
+        .value("Disconnected", trossen_vr::ConnectionStatus::Disconnected,
+            "No connection established or timed out")
+        .value("Connecting", trossen_vr::ConnectionStatus::Connecting,
+            "Initial connection attempt in progress")
+        .value("Connected", trossen_vr::ConnectionStatus::Connected,
+            "Connection established and healthy")
+        .value("Degraded", trossen_vr::ConnectionStatus::Degraded,
+            "Connection active but message frequency is low")
+        .export_values();
+
     // ControllerPose
     py::class_<trossen_vr::ControllerPose>(m, "ControllerPose",
         "VR controller pose (position + orientation)")
@@ -60,7 +73,13 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def_readwrite("port", &trossen_vr::ReceiverConfig::port,
             "UDP port to listen on (default: 9000)")
         .def_readwrite("buffer_size", &trossen_vr::ReceiverConfig::buffer_size,
-            "UDP receive buffer size in bytes (default: 2048)");
+            "UDP receive buffer size in bytes (default: 2048)")
+        .def_readwrite("timeout_seconds", &trossen_vr::ReceiverConfig::timeout_seconds,
+            "Connection timeout in seconds (default: 2.0)")
+        .def_readwrite("min_frequency_hz", &trossen_vr::ReceiverConfig::min_frequency_hz,
+            "Minimum expected message frequency in Hz (default: 30.0)")
+        .def_readwrite("loss_window", &trossen_vr::ReceiverConfig::loss_window,
+            "Window size for packet loss tracking (default: 100)");
 
     // NetworkManager
     py::class_<trossen_vr::NetworkManager>(m, "NetworkManager",
@@ -87,7 +106,23 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def("is_running", &trossen_vr::NetworkManager::is_running,
             "Check if receiver thread is running\\n\\n"
             "Returns:\\n"
-            "    bool: True if background thread is active");
+            "    bool: True if background thread is active")
+        .def("get_connection_status", &trossen_vr::NetworkManager::get_connection_status,
+            "Get current connection status\\n\\n"
+            "Thread-safe. Status is automatically updated based on message reception\\n"
+            "timing and frequency.\\n\\n"
+            "Returns:\\n"
+            "    ConnectionStatus: Current connection status")
+        .def("get_message_frequency", &trossen_vr::NetworkManager::get_message_frequency,
+            "Get current message reception frequency in Hz\\n\\n"
+            "Thread-safe. Calculated over a rolling window.\\n\\n"
+            "Returns:\\n"
+            "    float: Frequency in Hz, or 0.0 if no messages received yet")
+        .def("get_packet_loss_rate", &trossen_vr::NetworkManager::get_packet_loss_rate,
+            "Get packet loss rate over recent window\\n\\n"
+            "Thread-safe. Based on expected vs received message count.\\n\\n"
+            "Returns:\\n"
+            "    float: Loss rate between 0.0 (no loss) and 1.0 (100% loss)");
 
     // Teleop
     py::class_<trossen_vr::Teleop>(m, "Teleop",
