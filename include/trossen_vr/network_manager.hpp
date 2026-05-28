@@ -144,7 +144,7 @@ private:
     mutable std::mutex status_mutex_;
     std::atomic<ConnectionStatus> connection_status_{ConnectionStatus::Disconnected};
     std::chrono::steady_clock::time_point last_received_time_;
-    std::chrono::steady_clock::time_point first_received_time_;
+    double freq_ema_ = 0.0;       // exponential moving average of reception frequency
     size_t total_messages_received_ = 0;
     size_t expected_messages_ = 0;
     size_t lost_messages_ = 0;

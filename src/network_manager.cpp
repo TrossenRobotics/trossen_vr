@@ -80,13 +80,7 @@ ConnectionStatus NetworkManager::get_connection_status() const noexcept {
 
 double NetworkManager::get_message_frequency() const noexcept {
     std::lock_guard<std::mutex> lock(status_mutex_);
-    if (total_messages_received_ < 2) return 0.0;
-
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration<double>(now - first_received_time_).count();
-    if (elapsed <= 0.0) return 0.0;
-
-    return static_cast<double>(total_messages_received_) / elapsed;
+    return freq_ema_;
 }
 
 double NetworkManager::get_packet_loss_rate() const noexcept {
@@ -143,22 +137,13 @@ void NetworkManager::update_connection_status() {
         return;
     }
 
-    // Compute frequency inline — do NOT call get_message_frequency() here
-    // because that method also acquires status_mutex_, causing a deadlock.
-    double freq = 0.0;
-    if (total_messages_received_ >= 2) {
-        auto total_elapsed = std::chrono::duration<double>(now - first_received_time_).count();
-        if (total_elapsed > 0.0) {
-            freq = static_cast<double>(total_messages_received_) / total_elapsed;
-        }
-    }
-
-    if (freq > 0.0 && freq < config_.min_frequency_hz) {
+    // freq_ema_ is already computed and updated under this same lock — use it directly.
+    if (freq_ema_ > 0.0 && freq_ema_ < config_.min_frequency_hz) {
         connection_status_ = ConnectionStatus::Degraded;
         return;
     }
 
-    // Connection is healthy
+    // Connection is healthy.
     connection_status_ = ConnectionStatus::Connected;
 }
 
@@ -174,11 +159,13 @@ void NetworkManager::run() {
         // Wait up to 50ms for data (allows checking running_ flag periodically)
         int ret = poll(&pfd, 1, 50);
         if (ret <= 0) {
-            expected_messages_++;
-            if (expected_messages_ >= config_.loss_window) {
+            {
                 std::lock_guard<std::mutex> lock(status_mutex_);
-                expected_messages_ = 0;
-                lost_messages_ = 0;
+                expected_messages_++;
+                if (expected_messages_ >= config_.loss_window) {
+                    expected_messages_ = 0;
+                    lost_messages_ = 0;
+                }
             }
             continue;
         }
@@ -199,8 +186,11 @@ void NetworkManager::run() {
         }
 
         if (last_n <= 0) {
-            expected_messages_++;
-            lost_messages_++;
+            {
+                std::lock_guard<std::mutex> lock(status_mutex_);
+                expected_messages_++;
+                lost_messages_++;
+            }
             continue;
         }
 
@@ -208,14 +198,20 @@ void NetworkManager::run() {
         {
             std::lock_guard<std::mutex> lock(status_mutex_);
             auto now = std::chrono::steady_clock::now();
-            last_received_time_ = now;
-            if (total_messages_received_ == 0) {
-                first_received_time_ = now;
+
+            // EMA frequency from inter-message interval (alpha=0.2 → ~5 message time constant).
+            if (total_messages_received_ > 0) {
+                double dt = std::chrono::duration<double>(now - last_received_time_).count();
+                if (dt > 0.0) {
+                    double instant = 1.0 / dt;
+                    freq_ema_ = (freq_ema_ == 0.0) ? instant : 0.2 * instant + 0.8 * freq_ema_;
+                }
             }
+
+            last_received_time_ = now;
             total_messages_received_++;
             expected_messages_++;
 
-            // Reset counters periodically
             if (expected_messages_ >= config_.loss_window) {
                 expected_messages_ = 0;
                 lost_messages_ = 0;
