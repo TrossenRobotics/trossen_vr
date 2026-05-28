@@ -30,8 +30,8 @@ target_link_libraries(trossen_vr_lib PUBLIC
 )
 
 # Event-driven teleop demo
-add_executable(event_driven_teleop demos/cpp/event_driven_teleop.cpp)
-target_link_libraries(event_driven_teleop PRIVATE
+add_executable(dual_arm_teleop demos/cpp/event_driven_teleop.cpp)
+target_link_libraries(dual_arm_teleop PRIVATE
   trossen_vr_lib
   libtrossen_arm
 )

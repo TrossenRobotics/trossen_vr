@@ -45,11 +45,11 @@ cmake --install build
 
 **C++ demos** are in `demos/cpp/`:
 
-- `event_driven_teleop` — Event-driven dual-arm teleop using callback handlers. Press **A** to engage/disengage, **B** to exit. Triggers control grippers.
+- `dual_arm_teleop` — Event-driven dual-arm teleop using callback handlers. Press **A** to engage/disengage, **B** to exit. Triggers control grippers.
 - `manual_polling_teleop` — Manual frame polling with inline edge detection. Same controls, different implementation pattern.
 
 ```bash
-./build/event_driven_teleop
+./build/dual_arm_teleop
 ./build/manual_polling_teleop
 ```
 
