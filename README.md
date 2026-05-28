@@ -37,6 +37,18 @@ cmake --build build -j$(nproc)
 cmake --install build
 ```
 
+## Usage
+
+**C++**: Include the library with a single header:
+```cpp
+#include "trossen_vr/trossen_vr.hpp"
+```
+
+**Python**: Import the module:
+```python
+import trossen_vr as vr
+```
+
 ## Demos
 
 > **Before running any demo**, start the Trossen VR Teleop app on your Meta Quest headset. In the app, enter the IP address of the PC running the demo and press **Connect**. The headset and PC must be on the same network.

@@ -12,6 +12,21 @@
 
 namespace trossen_vr {
 
+/// @brief Connection status for VR data stream
+enum class ConnectionStatus {
+    /// @brief No connection established or timed out
+    Disconnected,
+
+    /// @brief Initial connection attempt in progress
+    Connecting,
+
+    /// @brief Connection established and healthy
+    Connected,
+
+    /// @brief Connection active but message frequency is low
+    Degraded
+};
+
 /// @brief 6D pose vector: [x, y, z, rx, ry, rz]
 /// Position in meters, rotation as axis-angle in radians
 using Vec6 = Eigen::Matrix<double, 6, 1>;

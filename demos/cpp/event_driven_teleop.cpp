@@ -9,9 +9,7 @@
 
 #include "libtrossen_arm/trossen_arm.hpp"
 
-#include "trossen_vr/network_manager.hpp"
-#include "trossen_vr/teleop.hpp"
-#include "trossen_vr/vr_types.hpp"
+#include "trossen_vr/trossen_vr.hpp"
 
 static volatile std::sig_atomic_t running = 1;
 
@@ -143,10 +141,33 @@ int main(int argc, char** argv) {
     // --- Main loop ---
     const double send_period = 1.0 / send_rate_hz;
     auto last_send_time = std::chrono::steady_clock::now();
+    trossen_vr::ConnectionStatus last_status = trossen_vr::ConnectionStatus::Disconnected;
 
-    std::cout << "Waiting for VR data... Press A to engage, B to exit" << std::endl;
+    std::cout << "Waiting for VR data... Press A to engage (Press A again to pause), Press B to exit" << std::endl;
 
     while (running) {
+        // Monitor connection status
+        auto current_status = receiver.get_connection_status();
+        if (current_status != last_status) {
+            switch (current_status) {
+                case trossen_vr::ConnectionStatus::Connecting:
+                    std::cout << "Connecting..." << std::endl;
+                    break;
+                case trossen_vr::ConnectionStatus::Connected:
+                    std::cout << "Connection established (";
+                    std::cout << receiver.get_message_frequency() << " Hz)" << std::endl;
+                    break;
+                case trossen_vr::ConnectionStatus::Degraded:
+                    std::cout << "Connection degraded (low frequency: ";
+                    std::cout << receiver.get_message_frequency() << " Hz)" << std::endl;
+                    break;
+                case trossen_vr::ConnectionStatus::Disconnected:
+                    std::cout << "Connection lost (timeout)" << std::endl;
+                    break;
+            }
+            last_status = current_status;
+        }
+
         auto frame = receiver.latest_frame();
         if (!frame) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -166,7 +187,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    // --- Graceful shutdown ---
+    // --- Shutdown ---
     receiver.stop();
     std::cout << "\nShutting down..." << std::endl;
     std::cout << "Moving arms to idle position" << std::endl;
