@@ -179,6 +179,10 @@ PYBIND11_MODULE(trossen_vr, m) {
     button_names.attr("LeftTrigger") = trossen_vr::ButtonNames::LeftTrigger;
     button_names.attr("RightGrip") = trossen_vr::ButtonNames::RightGrip;
     button_names.attr("LeftGrip") = trossen_vr::ButtonNames::LeftGrip;
+    button_names.attr("RightThumbstickX") = trossen_vr::ButtonNames::RightThumbstickX;
+    button_names.attr("RightThumbstickY") = trossen_vr::ButtonNames::RightThumbstickY;
+    button_names.attr("LeftThumbstickX") = trossen_vr::ButtonNames::LeftThumbstickX;
+    button_names.attr("LeftThumbstickY") = trossen_vr::ButtonNames::LeftThumbstickY;
 
     // Free functions
     m.def("vec6_to_T", &trossen_vr::vec6_to_T,

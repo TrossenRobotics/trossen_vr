@@ -68,6 +68,18 @@ namespace ButtonNames {
 
     /// @brief Left grip (analog 0.0-1.0)
     constexpr const char* LeftGrip = "leftGrip";
+
+    /// @brief Right thumbstick X axis (analog -1.0 to 1.0)
+    constexpr const char* RightThumbstickX = "rightThumbstickX";
+
+    /// @brief Right thumbstick Y axis (analog -1.0 to 1.0)
+    constexpr const char* RightThumbstickY = "rightThumbstickY";
+
+    /// @brief Left thumbstick X axis (analog -1.0 to 1.0)
+    constexpr const char* LeftThumbstickX = "leftThumbstickX";
+
+    /// @brief Left thumbstick Y axis (analog -1.0 to 1.0)
+    constexpr const char* LeftThumbstickY = "leftThumbstickY";
 }
 
 /// @brief Complete VR frame with controller poses and button states
