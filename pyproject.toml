@@ -9,10 +9,14 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
-    "numpy==2.3.5",
-    "scipy==1.16.3",
-    "trossen-arm==1.9.0",
-    "websockets==15.0.1",
+    "numpy>=2.0",
+    "pybind11>=2.11",
+    "trossen-arm>=1.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.6.0",
 ]
 
 [project.urls]

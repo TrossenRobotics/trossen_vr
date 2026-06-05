@@ -1,142 +1,177 @@
-#include <iostream>
 #include <cmath>
-#include <chrono>
-#include <thread>
-#include <array>
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
+#include <csignal>
 
-#include <trossen_vr/vr_manager.hpp>
-#include <trossen_vr/teleop.hpp>
-#include <trossen_vr/vr_types.hpp>
+#include <array>
+#include <chrono>
+#include <iostream>
+#include <thread>
+#include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
 
-// ---------------------------
-// Utility functions
-// ---------------------------
-Eigen::Matrix4d vec6_to_T(const std::array<double, 6>& v6) {
-    Eigen::Vector3d p(v6[0], v6[1], v6[2]);
-    Eigen::Vector3d rvec(v6[3], v6[4], v6[5]);
-    double angle = rvec.norm();
-    Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
-    if (angle > 1e-8) {
-        Eigen::Vector3d axis = rvec / angle;
-        R = Eigen::AngleAxisd(angle, axis).toRotationMatrix();
-    }
-    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    T.block<3,3>(0,0) = R;
-    T.block<3,1>(0,3) = p;
-    return T;
+#include "trossen_vr/network_manager.hpp"
+#include "trossen_vr/teleop.hpp"
+#include "trossen_vr/vr_types.hpp"
+
+static volatile std::sig_atomic_t running = 1;
+
+void signal_handler(int) {
+    running = 0;
 }
 
-std::array<double, 6> T_to_vec6(const Eigen::Matrix4d& T) {
-    std::array<double, 6> v6;
-    Eigen::Vector3d p = T.block<3,1>(0,3);
-    v6[0] = p.x(); v6[1] = p.y(); v6[2] = p.z();
-    Eigen::Matrix3d R = T.block<3,3>(0,0);
-    Eigen::AngleAxisd aa(R);
-    Eigen::Vector3d rvec = aa.axis() * aa.angle();
-    v6[3] = rvec.x(); v6[4] = rvec.y(); v6[5] = rvec.z();
-    return v6;
+struct ArmTeleopState {
+    bool engaged = false;
+    Eigen::Matrix4d T_offset = Eigen::Matrix4d::Identity();
+    trossen_vr::Vec6 last_vr_vec6 = trossen_vr::Vec6::Zero();
+    bool pose_valid = false;
+};
+
+void engage_arm(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver) {
+    if (state.engaged || !state.pose_valid) return;
+
+    auto current_p = driver.get_cartesian_positions();
+    Eigen::Map<Eigen::VectorXd> robot_start(current_p.data(), 6);
+    state.T_offset = trossen_vr::vec6_to_T(robot_start)
+                   * trossen_vr::vec6_to_T(state.last_vr_vec6).inverse();
+    state.engaged = true;
 }
 
-std::optional<std::array<double,6>> parse_vr_pose(const std::optional<trossen_vr::VRPose>& pose) {
-    if (!pose.has_value()) return std::nullopt;
-    std::array<double, 6> v6;
-    v6[0] = pose->position[0]; v6[1] = pose->position[1]; v6[2] = pose->position[2];
-    v6[3] = pose->rotation[0]; v6[4] = pose->rotation[1]; v6[5] = pose->rotation[2];
-    return v6;
+void disengage_arm(ArmTeleopState& state) {
+    if (!state.engaged) return;
+    state.engaged = false;
 }
 
-// ---------------------------
-// Main
-// ---------------------------
-int main() {
-    using namespace trossen_vr;
+void send_arm_command(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver,
+                      double cmd_goal_time) {
+    if (!state.engaged || !state.pose_valid) return;
 
-    std::vector<double> START_POSE = {0, M_PI/12, M_PI/12, 0, 0, 0};
-    std::vector<double> IDLE_POSE  = {0, 0, 0, 0, 0, 0};
+    Eigen::Matrix4d T_cmd = state.T_offset * trossen_vr::vec6_to_T(state.last_vr_vec6);
+    trossen_vr::Vec6 cmd_vec6 = trossen_vr::T_to_vec6(T_cmd);
 
-    trossen_arm::TrossenArmDriver driver;
-    driver.configure(trossen_arm::Model::wxai_v0,
-                     trossen_arm::StandardEndEffector::wxai_v0_follower,
-                     "192.168.1.2", true);
+    std::array<double, 6> goal{};
+    Eigen::VectorXd::Map(goal.data(), 6) = cmd_vec6;
+    driver.set_cartesian_positions(
+        goal, trossen_arm::InterpolationSpace::cartesian,
+        cmd_goal_time, false
+    );
+}
 
-    driver.set_arm_modes(trossen_arm::Mode::position);
-    driver.set_arm_positions(IDLE_POSE, 3.0, true);
-    driver.set_gripper_mode(trossen_arm::Mode::position);
-    driver.set_arm_positions(START_POSE, 3.0, true);
+int main(int argc, char** argv) {
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
-    std::cout << "Robot ready." << std::endl;
+    // --- Configuration ---
+    const std::string right_arm_ip = "192.168.1.2";
+    const std::string left_arm_ip = "192.168.1.3";
+    const double send_rate_hz = 100.0;
+    const double gripper_max_m = 0.04;
+    const double cmd_goal_time = 0.15;
 
-    // ---------------------------
-    // VRManager setup
-    // ---------------------------
-    VRManager::Config cfg;
-    cfg.server_port = 5432;
-    VRManager vr_manager(cfg);
-    vr_manager.start();
-    // ---------------------------
-    // Teleop setup
-    // ---------------------------
-    Teleop teleop;
+    trossen_vr::ReceiverConfig net_config;
+    net_config.port = 9000;
 
-    bool pause_teleop = true;
-    std::optional<std::array<double,6>> init_right_pose;
-    std::optional<std::array<double,6>> init_robot_pose;
-    Eigen::Matrix4d T_offset_right = Eigen::Matrix4d::Identity();
+    const std::vector<double> START_POSE = {0, M_PI/3, M_PI/6, M_PI/5, 0, 0};
+    const std::vector<double> IDLE_POSE  = {0, 0, 0, 0, 0, 0};
 
-    // ---------------------------
-    // Handlers
-    // ---------------------------
+    // --- Robot setup ---
+    trossen_arm::TrossenArmDriver right_driver;
+    trossen_arm::TrossenArmDriver left_driver;
 
-    // Right controller pose
-    teleop.set_right_pose_handler([&](const VRPose& pose) {
-        auto right_pose_opt = parse_vr_pose(pose);
-        if (!right_pose_opt.has_value() || pause_teleop) return;
+    right_driver.configure(
+        trossen_arm::Model::wxai_v0,
+        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        right_arm_ip, false
+    );
+    right_driver.set_all_modes(trossen_arm::Mode::position);
 
-        auto right_pose_vec = right_pose_opt.value();
+    left_driver.configure(
+        trossen_arm::Model::wxai_v0,
+        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        left_arm_ip, false
+    );
+    left_driver.set_all_modes(trossen_arm::Mode::position);
 
-        // Initialization
-        if (!init_right_pose.has_value()) {
-            init_robot_pose = driver.get_cartesian_positions();
-            init_right_pose = right_pose_vec;
-            T_offset_right = vec6_to_T(*init_robot_pose) * vec6_to_T(right_pose_vec).inverse();
-            std::cout << "Teleop initialized — right controller aligned." << std::endl;
-        }
+    std::cout << "Moving arms to start position" << std::endl;
+    right_driver.set_arm_positions(START_POSE, 2.0, true);
+    left_driver.set_arm_positions(START_POSE, 2.0, true);
 
-        Eigen::Matrix4d Tq = vec6_to_T(right_pose_vec);
-        Eigen::Matrix4d Tt = T_offset_right * Tq;
-        auto robot_cmd = T_to_vec6(Tt);
+    // --- Network setup ---
+    trossen_vr::NetworkManager receiver(net_config);
+    receiver.start();
 
-        driver.set_cartesian_positions(robot_cmd,
-                                       trossen_arm::InterpolationSpace::cartesian,
-                                       0.15, false);
-    });
+    // --- Arm state ---
+    ArmTeleopState right_state, left_state;
 
-    // Button handlers
-    teleop.set_button_A_handler([&](){ pause_teleop = !pause_teleop; });
-    teleop.set_button_B_handler([&](){ driver.set_arm_positions(IDLE_POSE, 3.0, true); });
+    // --- Event-driven teleop setup ---
+    trossen_vr::Teleop teleop;
 
-    // Gripper handled in right pose handler using button map
-    teleop.set_button_right_trigger_handler([&]() {
-
-        auto trigger_val_opt = vr_manager.get_button_state("right_trigger");
-        if (trigger_val_opt.has_value()) {
-            double trigger_val = std::get<double>(*trigger_val_opt);
-            driver.set_gripper_position(trigger_val * 0.04, 0.0, false);
+    teleop.on_button(trossen_vr::ButtonNames::A, [&]() {
+        if (!right_state.engaged && !left_state.engaged) {
+            engage_arm(right_state, right_driver);
+            engage_arm(left_state, left_driver);
+            std::cout << "Teleop ENGAGED" << std::endl;
+        } else {
+            disengage_arm(right_state);
+            disengage_arm(left_state);
+            std::cout << "Teleop PAUSED" << std::endl;
         }
     });
 
-    // ---------------------------
-    // Main polling loop (~200 Hz)
-    // ---------------------------
-    while (true) {
-        vr_manager.poll_teleop(teleop);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    teleop.on_button(trossen_vr::ButtonNames::B, [&]() {
+        std::cout << "Exit requested via B button" << std::endl;
+        running = false;
+    });
+
+    teleop.on_analog(trossen_vr::ButtonNames::RightTrigger, [&](double val) {
+        right_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+    });
+
+    teleop.on_analog(trossen_vr::ButtonNames::LeftTrigger, [&](double val) {
+        left_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+    });
+
+    teleop.on_right_pose([&](const trossen_vr::ControllerPose& pose) {
+        right_state.last_vr_vec6 = trossen_vr::unity_pose_to_vec6(pose.position, pose.rotation);
+        right_state.pose_valid = true;
+    });
+
+    teleop.on_left_pose([&](const trossen_vr::ControllerPose& pose) {
+        left_state.last_vr_vec6 = trossen_vr::unity_pose_to_vec6(pose.position, pose.rotation);
+        left_state.pose_valid = true;
+    });
+
+    // --- Main loop ---
+    const double send_period = 1.0 / send_rate_hz;
+    auto last_send_time = std::chrono::steady_clock::now();
+
+    std::cout << "Waiting for VR data... Press A to engage, B to exit" << std::endl;
+
+    while (running) {
+        auto frame = receiver.latest_frame();
+        if (!frame) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+
+        // Only dispatch if we got a new frame (avoid re-processing same data)
+        teleop.dispatch(*frame);
+
+        // Rate-limited Cartesian commands
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = now - last_send_time;
+        if (elapsed.count() >= send_period) {
+            last_send_time = now;
+            send_arm_command(right_state, right_driver, cmd_goal_time);
+            send_arm_command(left_state, left_driver, cmd_goal_time);
+        }
     }
 
-    driver.set_arm_positions(IDLE_POSE, 3.0, true);
+    // --- Graceful shutdown ---
+    receiver.stop();
+    std::cout << "\nShutting down..." << std::endl;
+    std::cout << "Moving arms to idle position" << std::endl;
+    right_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+    left_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+
     return 0;
 }

@@ -1,207 +1,197 @@
-#include <iostream>
 #include <cmath>
-#include <chrono>
-#include <thread>
-#include <array>
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
+#include <csignal>
 
-#include <trossen_vr/vr_manager.hpp>
-#include <trossen_vr/vr_types.hpp>
+#include <array>
+#include <chrono>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
 
+#include "trossen_vr/network_manager.hpp"
+#include "trossen_vr/teleop.hpp"
+#include "trossen_vr/vr_types.hpp"
 
-Eigen::Matrix4d vec6_to_T(const std::array<double, 6>& v6) {
-    Eigen::Vector3d p(v6[0], v6[1], v6[2]);
-    Eigen::Vector3d rvec(v6[3], v6[4], v6[5]);
-    double angle = rvec.norm();
-    Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
-    if (angle > 1e-8) {
-        Eigen::Vector3d axis = rvec / angle;
-        R = Eigen::AngleAxisd(angle, axis).toRotationMatrix();
-    }
-    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    T.block<3,3>(0,0) = R;
-    T.block<3,1>(0,3) = p;
-    return T;
+static volatile std::sig_atomic_t running = 1;
+
+void signal_handler(int) {
+    running = 0;
 }
 
-std::array<double, 6> T_to_vec6(const Eigen::Matrix4d& T) {
-    std::array<double, 6> v6;
-    Eigen::Vector3d p = T.block<3,1>(0,3);
-    v6[0] = p.x(); v6[1] = p.y(); v6[2] = p.z();
-
-    Eigen::Matrix3d R = T.block<3,3>(0,0);
-    Eigen::AngleAxisd aa(R);
-    Eigen::Vector3d rvec = aa.axis() * aa.angle();
-    v6[3] = rvec.x(); v6[4] = rvec.y(); v6[5] = rvec.z();
-    return v6;
-}
-
-std::optional<std::array<double,6>> pose_to_vec6(const std::optional<trossen_vr::VRPose>& pose) {
-    if (!pose.has_value()) return std::nullopt;
-    std::array<double, 6> v;
-    v[0] = pose->position[0];
-    v[1] = pose->position[1];
-    v[2] = pose->position[2];
-    v[3] = pose->rotation[0];
-    v[4] = pose->rotation[1];
-    v[5] = pose->rotation[2];
-    return v;
-}
-
-
-
-// -------------------------------------
-// MAIN — MANUAL MODE
-// -------------------------------------
-int main() {
-    using namespace trossen_vr;
-
-    std::vector<double> START_POSE = {0, M_PI/12, M_PI/12, 0, 0, 0};
-    std::vector<double> IDLE_POSE  = {0, 0, 0, 0, 0, 0};
-
-    // ---------------------------
-    // Robot setup
-    // ---------------------------
-    trossen_arm::TrossenArmDriver driver;
-    driver.configure(trossen_arm::Model::wxai_v0,
-                     trossen_arm::StandardEndEffector::wxai_v0_follower,
-                     "192.168.1.2", true);
-
-    driver.set_arm_modes(trossen_arm::Mode::position);
-    driver.set_gripper_mode(trossen_arm::Mode::position);
-    driver.set_arm_positions(START_POSE, 3.0, true);
-
-    std::cout << "Robot ready.\n";
-
-
-
-    // ---------------------------
-    // VRManager (manual mode)
-    // ---------------------------
-    VRManager::Config cfg;
-    cfg.server_port = 5432;
-    VRManager vr_manager(cfg);
-
-    vr_manager.start();
-
-    std::cout << "VR Manager started in MANUAL mode.\n";
-
-
-
-    // ---------------------------
-    // State for teleop alignment
-    // ---------------------------
-    bool pause_teleop = false;
-    std::optional<std::array<double,6>> init_right_pose;
-    std::optional<std::array<double,6>> init_robot_pose;
-    Eigen::Matrix4d T_offset_right = Eigen::Matrix4d::Identity();
-
-
-
-    // -------------------------------------
-    // BUTTON HANDLING HELPER 
-    // -------------------------------------
-    // handles rising edge detection for buttons 
-    std::unordered_map<std::string, bool> prev_buttons;
-    auto button_pressed = [&](const VRState& st, const std::string& name) {
-        auto it = st.buttons.find(name);
-        if (it == st.buttons.end()) return false;
+class EdgeDetector {
+public:
+    bool pressed(const trossen_vr::VRFrame& frame, const std::string& name) {
+        auto it = frame.buttons.find(name);
+        if (it == frame.buttons.end()) return false;
         if (!std::holds_alternative<bool>(it->second)) return false;
 
         bool current = std::get<bool>(it->second);
-        bool previous = prev_buttons[name];
-        prev_buttons[name] = current;
-        return (!previous && current);  // rising edge
-    };
+        bool previous = prev_[name];
+        prev_[name] = current;
+        return (current && !previous);
+    }
 
+    double analog(const trossen_vr::VRFrame& frame, const std::string& name) {
+        auto it = frame.buttons.find(name);
+        if (it == frame.buttons.end()) return 0.0;
+        if (!std::holds_alternative<double>(it->second)) return 0.0;
+        return std::get<double>(it->second);
+    }
 
+private:
+    std::unordered_map<std::string, bool> prev_;
+};
 
-    // ---------------------------
-    // Main teleop loop (~200 Hz)
-    // ---------------------------
-    while (true) {
+int main(int argc, char** argv) {
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
-        // Read a full VRState packet manually
-        auto frame_opt = vr_manager.get_current_state();
-        if (!frame_opt.has_value()) {
+    // --- Configuration ---
+    const std::string right_arm_ip = "192.168.1.2";
+    const std::string left_arm_ip = "192.168.1.3";
+    const double send_rate_hz = 100.0;
+    const double gripper_max_m = 0.04;
+    const double cmd_goal_time = 0.15;
+
+    trossen_vr::ReceiverConfig net_config;
+    net_config.port = 9000;
+
+    const std::vector<double> START_POSE = {0, M_PI/3, M_PI/6, M_PI/5, 0, 0};
+    const std::vector<double> IDLE_POSE  = {0, 0, 0, 0, 0, 0};
+
+    // --- Robot setup ---
+    trossen_arm::TrossenArmDriver right_driver;
+    trossen_arm::TrossenArmDriver left_driver;
+
+    right_driver.configure(
+        trossen_arm::Model::wxai_v0,
+        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        right_arm_ip, false
+    );
+    right_driver.set_all_modes(trossen_arm::Mode::position);
+
+    left_driver.configure(
+        trossen_arm::Model::wxai_v0,
+        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        left_arm_ip, false
+    );
+    left_driver.set_all_modes(trossen_arm::Mode::position);
+
+    std::cout << "Moving arms to start position" << std::endl;
+    right_driver.set_arm_positions(START_POSE, 2.0, true);
+    left_driver.set_arm_positions(START_POSE, 2.0, true);
+
+    // --- Network setup ---
+    trossen_vr::NetworkManager receiver(net_config);
+    receiver.start();
+
+    // --- Teleop state ---
+    bool teleop_active = false;
+    Eigen::Matrix4d T_offset_right = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d T_offset_left = Eigen::Matrix4d::Identity();
+    bool offset_captured = false;
+
+    EdgeDetector edges;
+    auto last_send_time = std::chrono::steady_clock::now();
+    const double send_period = 1.0 / send_rate_hz;
+
+    std::cout << "Waiting for VR data... Press A to engage, B to exit" << std::endl;
+
+    while (running) {
+        auto frame_opt = receiver.latest_frame();
+        if (!frame_opt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
+        const auto& frame = *frame_opt;
 
-        const VRState& frame = *frame_opt;
-
-
-        // -------------------------------------
-        // BUTTON HANDLING
-        // -------------------------------------
-        // Track previous button states (bool-type buttons only)
-        // Toggle pause/resume on A
-        if (button_pressed(frame, "a")) {
-            pause_teleop = !pause_teleop;
-            std::cout << (pause_teleop ? "Teleop PAUSED\n" : "Teleop RESUMED\n");
+        if (edges.pressed(frame, trossen_vr::ButtonNames::A)) {
+            teleop_active = !teleop_active;
+            if (teleop_active) {
+                offset_captured = false;
+                std::cout << "Teleop ENGAGED" << std::endl;
+            } else {
+                std::cout << "Teleop PAUSED" << std::endl;
+            }
         }
 
-
-        // B returns robot to idle pose
-        if (button_pressed(frame, "b")) {
-            std::cout << "Returning to IDLE pose.\n";
-            driver.set_arm_positions(IDLE_POSE, 3.0, true);
+        if (edges.pressed(frame, trossen_vr::ButtonNames::B)) {
+            std::cout << "Exit requested via B button" << std::endl;
             break;
         }
 
+        double right_trig = edges.analog(frame, trossen_vr::ButtonNames::RightTrigger);
+        right_driver.set_gripper_position(right_trig * gripper_max_m, 0.0, false);
 
+        double left_trig = edges.analog(frame, trossen_vr::ButtonNames::LeftTrigger);
+        left_driver.set_gripper_position(left_trig * gripper_max_m, 0.0, false);
 
+        if (!teleop_active) continue;
 
+        trossen_vr::Vec6 vr_right = trossen_vr::Vec6::Zero();
+        trossen_vr::Vec6 vr_left = trossen_vr::Vec6::Zero();
+        bool right_valid = false, left_valid = false;
 
-        // -------------------------------------
-        // GRIPPER TRIGGER
-        // -------------------------------------
-        {
-            auto it = frame.buttons.find("right_trigger");
-            if (it != frame.buttons.end() && std::holds_alternative<double>(it->second)) {
-                double trig_val = std::get<double>(it->second);
-                driver.set_gripper_position(trig_val * 0.04, 0.0, false);
-            }
+        if (frame.right) {
+            vr_right = trossen_vr::unity_pose_to_vec6(frame.right->position, frame.right->rotation);
+            right_valid = true;
+        }
+        if (frame.left) {
+            vr_left = trossen_vr::unity_pose_to_vec6(frame.left->position, frame.left->rotation);
+            left_valid = true;
         }
 
-
-        // -------------------------------------
-        // RIGHT CONTROLLER (main teleop)
-        // -------------------------------------
-        if (!pause_teleop) {
-            auto right_v6 = pose_to_vec6(frame.right_pose);
-            if (right_v6.has_value()) {
-
-                // controller robot alignment
-                if (!init_right_pose.has_value()) {
-                    init_robot_pose = driver.get_cartesian_positions();
-                    init_right_pose = right_v6;
-
-                    T_offset_right =
-                        vec6_to_T(*init_robot_pose) *
-                        vec6_to_T(*right_v6).inverse();
-
-                    std::cout << "Teleop initialized.\n";
-                }
-
-                Eigen::Matrix4d Tq = vec6_to_T(*right_v6);
-                Eigen::Matrix4d Tt = T_offset_right * Tq;
-                auto robot_cmd = T_to_vec6(Tt);
-
-                driver.set_cartesian_positions(
-                    robot_cmd,
-                    trossen_arm::InterpolationSpace::cartesian,
-                    0.15, false
-                );
+        if (!offset_captured) {
+            if (right_valid) {
+                auto rp = right_driver.get_cartesian_positions();
+                Eigen::Map<Eigen::VectorXd> rs(rp.data(), 6);
+                T_offset_right = trossen_vr::vec6_to_T(rs) * trossen_vr::vec6_to_T(vr_right).inverse();
             }
+            if (left_valid) {
+                auto lp = left_driver.get_cartesian_positions();
+                Eigen::Map<Eigen::VectorXd> ls(lp.data(), 6);
+                T_offset_left = trossen_vr::vec6_to_T(ls) * trossen_vr::vec6_to_T(vr_left).inverse();
+            }
+            if (right_valid || left_valid) {
+                offset_captured = true;
+                std::cout << "Offset captured — tracking active" << std::endl;
+            }
+            continue;
         }
 
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = now - last_send_time;
+        if (elapsed.count() < send_period) continue;
+        last_send_time = now;
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        if (right_valid) {
+            Eigen::Matrix4d T_cmd = T_offset_right * trossen_vr::vec6_to_T(vr_right);
+            trossen_vr::Vec6 cmd = trossen_vr::T_to_vec6(T_cmd);
+            std::array<double, 6> goal{};
+            Eigen::VectorXd::Map(goal.data(), 6) = cmd;
+            right_driver.set_cartesian_positions(
+                goal, trossen_arm::InterpolationSpace::cartesian, cmd_goal_time, false);
+        }
+
+        if (left_valid) {
+            Eigen::Matrix4d T_cmd = T_offset_left * trossen_vr::vec6_to_T(vr_left);
+            trossen_vr::Vec6 cmd = trossen_vr::T_to_vec6(T_cmd);
+            std::array<double, 6> goal{};
+            Eigen::VectorXd::Map(goal.data(), 6) = cmd;
+            left_driver.set_cartesian_positions(
+                goal, trossen_arm::InterpolationSpace::cartesian, cmd_goal_time, false);
+        }
     }
 
-    driver.set_arm_positions(IDLE_POSE, 3.0, true);
+    // --- Graceful shutdown ---
+    receiver.stop();
+    std::cout << "\nShutting down..." << std::endl;
+    std::cout << "Moving arms to idle position" << std::endl;
+    right_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+    left_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+
     return 0;
 }
