@@ -12,6 +12,9 @@
 
 namespace trossen_vr {
 
+/// @brief Constant pi for rotation conversions
+constexpr double pi = 3.14159265358979323846;
+
 /**
  * @brief Parse Pose6D from JSON object
  *

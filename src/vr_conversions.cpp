@@ -100,7 +100,7 @@ Pose6D transform4d_to_pose6d(const Transform4D& transform4d) {
     double theta = std::acos(cos_theta);
 
     if(theta > 1e-9) {
-        if (theta < M_PI - 1e-6) {
+        if (theta < pi - 1e-6) {
             double sin_theta_2 = 2.0 * std::sin(theta);
             pose6d.ax = (r32 - r23) / sin_theta_2 * theta;
             pose6d.ay = (r13 - r31) / sin_theta_2 * theta;
