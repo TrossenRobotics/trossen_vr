@@ -2,8 +2,6 @@
 #define TROSSEN_VR_TELEOP_HPP
 
 #include <functional>
-#include <string>
-#include <unordered_map>
 
 #include "trossen_vr/vr_types.hpp"
 
@@ -21,40 +19,74 @@ namespace trossen_vr {
 class Teleop {
 public:
     /// @brief Handler for controller pose updates
-    using PoseHandler = std::function<void(const ControllerPose&)>;
+    using PoseHandler = std::function<void(const Pose6D&)>;
 
     /// @brief Handler for digital button presses (no arguments)
     using ButtonHandler = std::function<void()>;
 
     /// @brief Handler for analog inputs (receives value 0.0-1.0)
-    using AnalogHandler = std::function<void(double)>;
+    using AnalogHandler = std::function<void(float)>;
 
     /**
-     * @brief Register handler for digital button press
+     * @brief Register handler for button A (right controller)
      *
      * Handler fires once when button transitions from released to pressed (rising edge).
      *
-     * @param name Button name (use ButtonNames constants)
      * @param handler Callback function, called on button press
      */
-    void on_button(const std::string& name, ButtonHandler handler);
+    void on_button_a(ButtonHandler handler);
 
     /**
-     * @brief Register handler for analog input
+     * @brief Register handler for button B (right controller)
      *
-     * Handler fires every dispatch() call with current analog value.
+     * Handler fires once when button transitions from released to pressed (rising edge).
      *
-     * @param name Input name (use ButtonNames constants)
+     * @param handler Callback function, called on button press
+     */
+    void on_button_b(ButtonHandler handler);
+
+    /**
+     * @brief Register handler for button X (left controller)
+     *
+     * Handler fires once when button transitions from released to pressed (rising edge).
+     *
+     * @param handler Callback function, called on button press
+     */
+    void on_button_x(ButtonHandler handler);
+
+    /**
+     * @brief Register handler for button Y (left controller)
+     *
+     * Handler fires once when button transitions from released to pressed (rising edge).
+     *
+     * @param handler Callback function, called on button press
+     */
+    void on_button_y(ButtonHandler handler);
+
+    /**
+     * @brief Register handler for right index trigger
+     *
+     * Handler fires every dispatch() call with current trigger value.
+     *
      * @param handler Callback function, receives value 0.0-1.0
      */
-    void on_analog(const std::string& name, AnalogHandler handler);
+    void on_right_trigger(AnalogHandler handler);
+
+    /**
+     * @brief Register handler for left index trigger
+     *
+     * Handler fires every dispatch() call with current trigger value.
+     *
+     * @param handler Callback function, receives value 0.0-1.0
+     */
+    void on_left_trigger(AnalogHandler handler);
 
     /**
      * @brief Register handler for right controller pose updates
      *
      * Handler fires every dispatch() call when right controller is tracked.
      *
-     * @param handler Callback function, receives ControllerPose
+     * @param handler Callback function, receives Pose6D
      */
     void on_right_pose(PoseHandler handler);
 
@@ -63,27 +95,40 @@ public:
      *
      * Handler fires every dispatch() call when left controller is tracked.
      *
-     * @param handler Callback function, receives ControllerPose
+     * @param handler Callback function, receives Pose6D
      */
     void on_left_pose(PoseHandler handler);
 
     /**
-     * @brief Process VR frame and fire registered handlers
+     * @brief Dispatch VR frame to all registered handlers
      *
-     * Detects button state changes and invokes appropriate callbacks.
-     * Safe to call from multiple threads, but handler registration is not thread-safe.
+     * Processes button state changes, analog inputs, and poses.
+     * Call this once per frame with the latest VR data.
      *
-     * @param frame VR frame to process
+     * @param frame VR frame data from NetworkManager
      */
     void dispatch(const VRFrame& frame);
 
 private:
-    std::unordered_map<std::string, ButtonHandler> button_handlers_;
-    std::unordered_map<std::string, AnalogHandler> analog_handlers_;
-    std::unordered_map<std::string, bool> prev_button_states_;
+    // Button handlers
+    ButtonHandler button_a_handler_;
+    ButtonHandler button_b_handler_;
+    ButtonHandler button_x_handler_;
+    ButtonHandler button_y_handler_;
 
+    // Analog handlers
+    AnalogHandler right_trigger_handler_;
+    AnalogHandler left_trigger_handler_;
+
+    // Pose handlers
     PoseHandler right_pose_handler_;
     PoseHandler left_pose_handler_;
+
+    // Previous button states for edge detection
+    uint8_t prev_button_a_ = 0;
+    uint8_t prev_button_b_ = 0;
+    uint8_t prev_button_x_ = 0;
+    uint8_t prev_button_y_ = 0;
 };
 
 } // namespace trossen_vr
