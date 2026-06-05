@@ -14,8 +14,6 @@
 #include <thread>
 #include <vector>
 
-#include <nlohmann/json.hpp>
-
 #include "trossen_vr/vr_types.hpp"
 #include "trossen_vr/vr_conversions.hpp"
 
@@ -134,7 +132,7 @@ private:
     /**
      * @brief Send ACK packet to VR client
      *
-     * Sends JSON ACK with current frequency and packet loss statistics
+     * Sends JSON ACK with current timestamp and message frequency
      * to the client address on the configured ACK port.
      */
     void send_ack();

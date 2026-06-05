@@ -43,6 +43,15 @@ PYBIND11_MODULE(trossen_vr, m) {
         .def_readwrite("index_trigger", &trossen_vr::Triggers::index_trigger,
             "Index finger trigger value (0.0 = released, 1.0 = fully pressed)");
 
+    // Thumbstick
+    py::class_<trossen_vr::Thumbstick>(m, "Thumbstick",
+        "Controller thumbstick analog axes (-1.0 to 1.0)")
+        .def(py::init<>())
+        .def_readwrite("x_axis", &trossen_vr::Thumbstick::x_axis,
+            "X-axis value (-1.0 = left, 1.0 = right)")
+        .def_readwrite("y_axis", &trossen_vr::Thumbstick::y_axis,
+            "Y-axis value (-1.0 = down, 1.0 = up)");
+
     // Buttons
     py::class_<trossen_vr::Buttons>(m, "Buttons",
         "Controller button states")
@@ -58,6 +67,8 @@ PYBIND11_MODULE(trossen_vr, m) {
             "Controller 6D pose")
         .def_readwrite("triggers", &trossen_vr::ControllerFrame::triggers,
             "Trigger values")
+        .def_readwrite("thumbstick", &trossen_vr::ControllerFrame::thumbstick,
+            "Thumbstick analog axes")
         .def_readwrite("buttons", &trossen_vr::ControllerFrame::buttons,
             "Button states")
         .def_readwrite("is_tracked", &trossen_vr::ControllerFrame::is_tracked,

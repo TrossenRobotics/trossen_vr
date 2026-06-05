@@ -11,6 +11,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <nlohmann/json.hpp>
+
 namespace trossen_vr {
 
 NetworkManager::NetworkManager(const ReceiverConfig& config)
