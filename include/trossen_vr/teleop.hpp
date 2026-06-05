@@ -10,9 +10,9 @@ namespace trossen_vr {
 /**
  * @brief Event-driven VR teleoperation dispatcher
  *
- * Register callback handlers for button presses, analog inputs, and controller poses.
- * Digital buttons use rising-edge detection (fire once per press).
- * Analog inputs and poses fire on every dispatch() call.
+ * Register callback handlers for button presses, analog inputs, and controller poses. Digital
+ * buttons use rising-edge detection (fire once per press). Analog inputs fire on every dispatch()
+ * call; poses fire on every dispatch() call when the controller is tracked.
  *
  * @note Handler registration is not thread-safe - set all handlers before calling dispatch()
  */

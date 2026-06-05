@@ -207,9 +207,10 @@ void NetworkManager::run() {
         try {
             auto data = nlohmann::json::parse(buffer_.data(), buffer_.data() + last_n);
             auto frame = parse_vr_frame(data, config_.grip_threshold);
-            std::lock_guard<std::mutex> lock(frame_mutex_);
-            latest_frame_ = std::move(frame);
-
+            {
+                std::lock_guard<std::mutex> lock(frame_mutex_);
+                latest_frame_ = std::move(frame);
+            }
             send_ack();
         } catch (const nlohmann::json::exception& e) {
             std::cerr << "[VR] Skipping malformed UDP packet: " << e.what() << std::endl;
