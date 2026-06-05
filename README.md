@@ -28,6 +28,9 @@ Follow the [libtrossen_arm C++ installation guide](https://docs.trossenrobotics.
 # Configure and build
 cmake -B build
 cmake --build build -j$(nproc)
+
+# Install library and headers (optional, for use in other projects)
+sudo cmake --install build
 ```
 
 ### Build C++ Demos (Optional)

@@ -173,7 +173,13 @@ int main(int argc, char** argv) {
         // Rate limiting
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_send_time;
-        if (elapsed.count() < send_period) continue;
+        if (elapsed.count() < send_period) {
+            // Sleep for remaining time
+            double remaining = send_period - elapsed.count();
+            std::this_thread::sleep_for(
+                std::chrono::duration<double>(remaining));
+            continue;
+        }
         last_send_time = now;
 
         // Send commands only when controllers are tracked

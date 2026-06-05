@@ -176,6 +176,9 @@ while running:
     # Rate limiting
     now = time.monotonic()
     if now - last_send < send_period:
+        # Sleep for remaining time
+        remaining = send_period - (now - last_send)
+        time.sleep(remaining)
         continue
     last_send = now
 
