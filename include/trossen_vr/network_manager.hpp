@@ -14,37 +14,43 @@
 #include <thread>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "trossen_vr/vr_types.hpp"
+#include "trossen_vr/vr_conversions.hpp"
 
 namespace trossen_vr {
 
-/// @brief UDP receiver configuration
+/**
+ * @brief Network receiver configuration
+ *
+ * Controls network behavior, connection monitoring, and ACK transmission.
+ */
 struct ReceiverConfig {
-    /// @brief UDP port to listen on (default: 9000)
+    /// @brief Port to listen on (default: 9000)
     uint16_t port = 9000;
 
-    /// @brief UDP receive buffer size in bytes (default: 2048)
+    /// @brief Receive buffer size in bytes (default: 2048)
     size_t buffer_size = 2048;
 
     /// @brief Connection timeout in seconds (default: 2.0)
-    /// If no message received for this duration, status becomes Disconnected
     double timeout_seconds = 2.0;
 
     /// @brief Minimum expected message frequency in Hz (default: 30.0)
-    /// If frequency drops below this, status becomes Degraded
     double min_frequency_hz = 30.0;
 
-    /// @brief Window size for packet loss tracking (default: 100)
-    size_t loss_window = 100;
-
-    /// @brief UDP port to send ACK packets to VR app (default: 9001)
+    /// @brief Port to send ACK packets to VR app (default: 9001)
     uint16_t ack_port = 9001;
+
+    /// @brief Grip trigger threshold for deadman switch (default: 0.9)
+    /// Controllers are only considered tracked when hand_trigger >= this value
+    double grip_threshold = 0.9;
 };
 
 /**
  * @brief Network manager for VR controller data
  *
- * Runs a background thread that continuously receives UDP packets and maintains
+ * Runs a background thread that continuously receives packets and maintains
  * the latest VR frame. Thread-safe access via latest_frame().
  */
 class NetworkManager {
@@ -52,20 +58,23 @@ public:
     /**
      * @brief Construct network manager
      *
-     * @param config Receiver configuration (port and buffer size)
+     * @param config Receiver configuration
      */
     explicit NetworkManager(const ReceiverConfig& config = {});
 
-    /// @brief Destroy manager and stop background thread
+    /**
+     * @brief Destroy manager and stop background thread
+     */
     ~NetworkManager();
 
+    // Prevent copying to ensure unique ownership of the underlying network socket
     NetworkManager(const NetworkManager&) = delete;
     NetworkManager& operator=(const NetworkManager&) = delete;
 
     /**
      * @brief Start receiving VR data on background thread
      *
-     * Binds to the configured UDP port and starts packet reception.
+     * Binds to the configured port and starts packet reception.
      *
      * @throws std::runtime_error if socket creation or binding fails
      */
@@ -113,18 +122,29 @@ public:
      */
     double get_message_frequency() const noexcept;
 
-    /**
-     * @brief Get packet loss rate over recent window
-     *
-     * Based on expected vs received message count.
-     *
-     * @return Loss rate between 0.0 (no loss) and 1.0 (100% loss)
-     */
-    double get_packet_loss_rate() const noexcept;
-
 private:
+    /**
+     * @brief Main receiver thread loop
+     *
+     * Continuously polls for packets, parses VR frames,
+     * updates connection status, and sends ACK packets.
+     */
     void run();
+
+    /**
+     * @brief Send ACK packet to VR client
+     *
+     * Sends JSON ACK with current frequency and packet loss statistics
+     * to the client address on the configured ACK port.
+     */
     void send_ack();
+
+    /**
+     * @brief Update connection status based on message timing
+     *
+     * Determines status (Disconnected/Connecting/Connected/Degraded)
+     * based on message count, timeout, and frequency thresholds.
+     */
     void update_connection_status();
 
     ReceiverConfig config_;
@@ -147,8 +167,6 @@ private:
     size_t freq_window_count_ = 0;
     double message_frequency_hz_ = 0.0;
     size_t total_messages_received_ = 0;
-    size_t expected_messages_ = 0;
-    size_t lost_messages_ = 0;
 };
 
 } // namespace trossen_vr
