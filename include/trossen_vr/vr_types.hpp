@@ -1,260 +1,207 @@
 #ifndef TROSSEN_VR_VR_TYPES_HPP
 #define TROSSEN_VR_VR_TYPES_HPP
 
-#include <iostream>
-#include <optional>
-#include <string>
-#include <unordered_map>
-#include <variant>
-
-#include <Eigen/Dense>
-#include <nlohmann/json.hpp>
+#include <array>
+#include <cstdint>
 
 namespace trossen_vr {
 
-/// @brief 6D pose vector: [x, y, z, rx, ry, rz]
-/// Position in meters, rotation as axis-angle in radians
-using Vec6 = Eigen::Matrix<double, 6, 1>;
+/**
+ * @brief Connection status for VR data stream
+ *
+ * Represents the current state of bidirectional communication
+ * between PC and VR headset.
+ */
+enum class ConnectionStatus {
+    /// @brief No connection established or timed out
+    Disconnected,
 
-/// @brief Button value variant - either bool (digital) or double (analog 0.0-1.0)
-using ButtonValue = std::variant<bool, double>;
+    /// @brief Initial connection attempt in progress
+    Connecting,
 
-/// @brief VR controller pose (position + orientation)
-struct ControllerPose {
-    /// @brief Position vector in meters (x, y, z)
-    Eigen::Vector3d position = Eigen::Vector3d::Zero();
+    /// @brief Connection established and healthy
+    Connected,
 
-    /// @brief Orientation as quaternion (w, x, y, z)
-    Eigen::Quaterniond rotation = Eigen::Quaterniond::Identity();
+    /// @brief Connection active but message frequency is low
+    Degraded
 };
 
-/// @brief Standard button names from Unity VR controller mapping
-namespace ButtonNames {
-    /// @brief Digital button A (bool)
-    constexpr const char* A = "a";
+/**
+ * @brief 6-DOF pose in robot coordinate system
+ *
+ * Position in meters and rotation as axis-angle in radians.
+ * Axis-angle format: rotation axis direction scaled by rotation angle.
+ */
+struct Pose6D {
+    /// @brief X-axis position in meters
+    double x = 0.0;
 
-    /// @brief Digital button B (bool)
-    constexpr const char* B = "b";
+    /// @brief Y-axis position in meters
+    double y = 0.0;
 
-    /// @brief Digital button X (bool)
-    constexpr const char* X = "x";
+    /// @brief Z-axis position in meters
+    double z = 0.0;
 
-    /// @brief Digital button Y (bool)
-    constexpr const char* Y = "y";
+    /// @brief X component of axis-angle rotation in radians
+    double ax = 0.0;
 
-    /// @brief Right index trigger (analog 0.0-1.0)
-    constexpr const char* RightTrigger = "rightTrigger";
+    /// @brief Y component of axis-angle rotation in radians
+    double ay = 0.0;
 
-    /// @brief Left index trigger (analog 0.0-1.0)
-    constexpr const char* LeftTrigger = "leftTrigger";
+    /// @brief Z component of axis-angle rotation in radians
+    double az = 0.0;
+};
 
-    /// @brief Right grip (analog 0.0-1.0)
-    constexpr const char* RightGrip = "rightGrip";
+/**
+ * @brief VR controller trigger states
+ *
+ * Index trigger value in [0.0, 1.0] range.
+ * Note: Hand/grip trigger is used internally for deadman switch and not exposed.
+ */
+struct Triggers {
+    /// @brief Index finger trigger
+    double index_trigger = 0.0;
+};
 
-    /// @brief Left grip (analog 0.0-1.0)
-    constexpr const char* LeftGrip = "leftGrip";
-}
+/**
+ * @brief VR controller analog thumbstick states
+ *
+ * 2D analog stick axes values in [-1.0, 1.0] range.
+ */
+struct Thumbstick {
+    /// @brief x axis
+    float x_axis = 0.0f;
 
-/// @brief Complete VR frame with controller poses and button states
+    /// @brief y axis
+    float y_axis = 0.0f;
+};
+
+/**
+ * @brief VR controller digital button states
+ *
+ * Binary button states. Button mapping depends on controller side:
+ * - Right controller: one = A, two = B
+ * - Left controller: one = X, two = Y
+ */
+struct Buttons {
+    /// @brief Primary button: A (right) or X (left)
+    uint8_t one = 0;
+
+    /// @brief Secondary button: B (right) or Y (left)
+    uint8_t two = 0;
+};
+
+/**
+ * @brief Complete state of a single VR controller
+ *
+ * Contains tracking status, 6-DOF pose, and all input states
+ * for controller.
+ */
+struct ControllerFrame {
+    /// @brief Tracking status: 1 = tracked, 0 = not tracked
+    uint8_t is_tracked = 0;
+
+    /// @brief 6-DOF pose (position + rotation)
+    Pose6D pose6d;
+
+    /// @brief Analog Trigger states
+    Triggers triggers;
+
+    /// @brief Analog Thumbstick states
+    Thumbstick thumbstick;
+
+    /// @brief Digital button states
+    Buttons buttons;
+};
+
+/**
+ * @brief Complete VR frame with both controllers
+ *
+ * Represents the full state received from the VR headset in a single
+ * network packet, including both left and right controller states.
+ */
 struct VRFrame {
-    /// @brief Right controller pose (empty if not tracked)
-    std::optional<ControllerPose> right;
+    /// @brief Right controller state
+    ControllerFrame right_controller;
 
-    /// @brief Left controller pose (empty if not tracked)
-    std::optional<ControllerPose> left;
-
-    /// @brief Button states map (name -> ButtonValue)
-    std::unordered_map<std::string, ButtonValue> buttons;
-
-    /**
-     * @brief Get digital button state
-     *
-     * @param name Button name (use ButtonNames constants)
-     * @return Button pressed state, false if not found or wrong type
-     */
-    bool get_button(const std::string& name) const {
-        auto it = buttons.find(name);
-        if (it == buttons.end()) return false;
-        if (const bool* val = std::get_if<bool>(&it->second)) {
-            return *val;
-        }
-        return false;
-    }
-
-    /**
-     * @brief Get analog input value
-     *
-     * @param name Input name (use ButtonNames constants)
-     * @return Analog value 0.0-1.0, or 0.0 if not found or wrong type
-     */
-    double get_analog(const std::string& name) const {
-        auto it = buttons.find(name);
-        if (it == buttons.end()) return 0.0;
-        if (const double* val = std::get_if<double>(&it->second)) {
-            return *val;
-        }
-        return 0.0;
-    }
+    /// @brief Left controller state
+    ControllerFrame left_controller;
 };
 
 /**
- * @brief Convert JSON {x, y, z} to Eigen::Vector3d
+ * @brief 4x4 homogeneous transformation matrix
  *
- * @param j JSON object with x, y, z fields
- * @param v Output vector
+ * Storage for SE(3) transformations.
+ * Provides inverse() and matrix multiplication operations.
  */
-inline void from_json(const nlohmann::json& j, Eigen::Vector3d& v) {
-    v.x() = j.at("x").get<double>();
-    v.y() = j.at("y").get<double>();
-    v.z() = j.at("z").get<double>();
-}
+struct Transform4D {
+    std::array<double, 16> transform4d = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    };
 
-/**
- * @brief Convert JSON {w, x, y, z} to Eigen::Quaterniond
- *
- * @param j JSON object with w, x, y, z fields
- * @param q Output quaternion
- */
-inline void from_json(const nlohmann::json& j, Eigen::Quaterniond& q) {
-    q.w() = j.at("w").get<double>();
-    q.x() = j.at("x").get<double>();
-    q.y() = j.at("y").get<double>();
-    q.z() = j.at("z").get<double>();
-}
+    /**
+     * @brief Access matrix element at (row, col)
+     */
+    double& operator()(std::size_t row, std::size_t col) { return transform4d[row * 4 + col]; }
 
-/**
- * @brief Convert JSON button object to ButtonValue map
- *
- * @param j JSON object with button names as keys
- * @param buttons Output button state map
- */
-inline void from_json(const nlohmann::json& j,
-                     std::unordered_map<std::string, trossen_vr::ButtonValue>& buttons) {
-    for (const auto& [key, val] : j.items()) {
-        if (val.is_boolean()) {
-            buttons[key] = val.get<bool>();
-        } else if (val.is_number()) {
-            buttons[key] = val.get<double>();
+    /**
+     * @brief Access matrix element at (row, col) - const version
+     */
+    const double& operator()(std::size_t row, std::size_t col) const { return transform4d[row * 4 + col]; }
+
+    /**
+     * @brief Compute matrix inverse
+     *
+     * Computes inverse of SE(3) matrix using structure:
+     * inv([R t; 0 1]) = [R' -R't; 0 1]
+     *
+     * @return Inverted transformation matrix
+     */
+    Transform4D inverse() const {
+        Transform4D inv;
+
+        inv(0,0) = (*this)(0,0); inv(0,1) = (*this)(1,0); inv(0,2) = (*this)(2,0);
+        inv(1,0) = (*this)(0,1); inv(1,1) = (*this)(1,1); inv(1,2) = (*this)(2,1);
+        inv(2,0) = (*this)(0,2); inv(2,1) = (*this)(1,2); inv(2,2) = (*this)(2,2);
+
+        double tx = (*this)(0,3);
+        double ty = (*this)(1,3);
+        double tz = (*this)(2,3);
+
+        inv(0,3) = -(inv(0,0) * tx + inv(0,1) * ty + inv(0,2) * tz);
+        inv(1,3) = -(inv(1,0) * tx + inv(1,1) * ty + inv(1,2) * tz);
+        inv(2,3) = -(inv(2,0) * tx + inv(2,1) * ty + inv(2,2) * tz);
+
+        inv(3,0) = 0.0; inv(3,1) = 0.0; inv(3,2) = 0.0; inv(3,3) = 1.0;
+
+        return inv;
+    }
+
+    /**
+     * @brief Matrix multiplication operator
+     *
+     * Computes (this * rhs) using standard 4x4 matrix multiplication.
+     *
+     * @param rhs Right-hand side transformation matrix
+     * @return Result of matrix multiplication
+     */
+    Transform4D operator*(const Transform4D& rhs) const {
+        Transform4D result;
+        for (std::size_t r = 0; r < 3; ++r) {
+            for (std::size_t c = 0; c < 4; ++c) {
+                result(r, c) = (*this)(r, 0) * rhs(0, c) +
+                               (*this)(r, 1) * rhs(1, c) +
+                               (*this)(r, 2) * rhs(2, c) +
+                               (*this)(r, 3) * rhs(3, c);
+            }
         }
+        result(3, 0) = 0.0; result(3, 1) = 0.0; result(3, 2) = 0.0; result(3, 3) = 1.0;
+        return result;
     }
-}
-
-/**
- * @brief Convert 6D pose vector to 4x4 homogeneous transform
- *
- * @param v6 Pose vector [x, y, z, rx, ry, rz] in meters and radians
- * @return 4x4 transformation matrix
- */
-inline Eigen::Matrix4d vec6_to_T(const Vec6& v6) {
-    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-
-    T.block<3, 1>(0, 3) = v6.head<3>();
-
-    Eigen::Vector3d rvec = v6.tail<3>();
-    double angle = rvec.norm();
-    if (angle > 1e-8) {
-        Eigen::AngleAxisd aa(angle, rvec / angle);
-        T.block<3, 3>(0, 0) = aa.toRotationMatrix();
-    }
-
-    return T;
-}
-
-/**
- * @brief Convert 4x4 homogeneous transform to 6D pose vector
- *
- * @param T 4x4 transformation matrix
- * @return Pose vector [x, y, z, rx, ry, rz] in meters and radians
- */
-inline Vec6 T_to_vec6(const Eigen::Matrix4d& T) {
-    Vec6 v6;
-    v6.head<3>() = T.block<3, 1>(0, 3);
-
-    Eigen::AngleAxisd aa(T.block<3, 3>(0, 0));
-    v6.tail<3>() = aa.axis() * aa.angle();
-
-    return v6;
-}
-
-/**
- * @brief Convert Unity VR pose to robot coordinate frame
- *
- * Transforms from Unity coordinates (right, up, forward) to robot frame (forward, left, up)
- *
- * @param pos Position in Unity frame (meters)
- * @param rot Rotation as quaternion in Unity frame
- * @return 6D pose in robot frame [x, y, z, rx, ry, rz]
- */
-inline Vec6 unity_pose_to_vec6(const Eigen::Vector3d& pos,
-                               const Eigen::Quaterniond& rot) {
-    Vec6 v6;
-
-    // Position remap
-    v6[0] =  pos.z();   // forward
-    v6[1] = -pos.x();   // left
-    v6[2] =  pos.y();   // up
-
-    // Rotation remap
-    Eigen::AngleAxisd aa(rot);
-    double angle = aa.angle();
-
-    if (angle < 1e-8) {
-        v6.tail<3>().setZero();
-    } else {
-        Eigen::Vector3d axis_unity = aa.axis();
-        Eigen::Vector3d axis_robot(-axis_unity.z(), axis_unity.x(), -axis_unity.y());
-        v6.tail<3>() = axis_robot * angle;
-    }
-
-    return v6;
-}
-
-/**
- * @brief Parse VR frame from JSON data
- *
- * Extracts controller poses and button states from Unity VR app UDP packet
- *
- * @param data JSON object from Unity app
- * @return Parsed VR frame
- */
-inline VRFrame parse_vr_frame(const nlohmann::json& data) {
-    VRFrame frame;
-
-    // Parse right controller
-    try {
-        if (data.contains("rightPosition") && data.contains("rightRotation")) {
-            ControllerPose pose;
-            from_json(data["rightPosition"], pose.position);
-            from_json(data["rightRotation"], pose.rotation);
-            frame.right = pose;
-        }
-    } catch (const nlohmann::json::exception& e) {
-        std::cerr << "[VR] Failed to parse right controller: " << e.what() << std::endl;
-    }
-
-    // Parse left controller
-    try {
-        if (data.contains("leftPosition") && data.contains("leftRotation")) {
-            ControllerPose pose;
-            from_json(data["leftPosition"], pose.position);
-            from_json(data["leftRotation"], pose.rotation);
-            frame.left = pose;
-        }
-    } catch (const nlohmann::json::exception& e) {
-        std::cerr << "[VR] Failed to parse left controller: " << e.what() << std::endl;
-    }
-
-    // Parse button states
-    try {
-        if (data.contains("buttons") && data["buttons"].is_object()) {
-            from_json(data["buttons"], frame.buttons);
-        }
-    } catch (const nlohmann::json::exception& e) {
-        std::cerr << "[VR] Failed to parse buttons: " << e.what() << std::endl;
-    }
-
-    return frame;
-}
+};
 
 } // namespace trossen_vr
 
