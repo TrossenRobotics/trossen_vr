@@ -95,7 +95,7 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
 
 | Element | Description |
 |---------|-------------|
-| **IP Address field** | IP address of the PC running the this trossen_vr lib |
+| **IP Address field** | IP address of the PC running this `trossen_vr` library |
 | **Start** | Connect to the robot PC |
 | **Stop** | Disconnect |
 | **Status** | Connection state: `Disconnected` → `Connecting` → `Connected` / `Degraded` |
