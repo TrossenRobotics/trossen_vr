@@ -75,13 +75,32 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
    ```bash
    sudo apt install adb
    ```
-2. Connect the headset to your PC via USB. Put the headset on — a prompt will appear inside asking you to Allow USB Debugging. Select Always allow from this computer and confirm.
-3. Verify the headset is detected:
+
+2. Fix permissions (required on first use):
+   ```bash
+   # Create udev rules for Meta Quest
+   echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2833", MODE="0666", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/51-android.rules
+   sudo chmod a+r /etc/udev/rules.d/51-android.rules
+
+   # Reload udev rules
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+
+   # Restart ADB and reconnect headset
+   adb kill-server
+   adb start-server
+   ```
+   Disconnect and reconnect the headset USB cable after running these commands.
+
+3. Connect the headset to your PC via USB. Put the headset on — a prompt will appear inside asking you to Allow USB Debugging. Select Always allow from this computer and confirm.
+
+4. Verify the headset is detected:
    ```bash
    adb devices
    ```
    You should see a device listed with status `device`. If it shows `unauthorized`, re-check the Allow USB Debugging prompt inside the headset.
-4. Install the APK:
+
+5. Install the APK:
    ```bash
    adb install assets/VR_Teleop.apk
    ```
@@ -128,7 +147,8 @@ Remove the headset and place it somewhere with a clear view of the controllers �
 
 > **Note on the proximity sensor:** Meta does not currently provide a built-in option to disable the proximity sensor from within the app — the headset will go to sleep immediately when removed. We will update the app once Meta adds support for this. In the meantime, two workarounds are available:
 >
-> - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
+> - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
+
 > - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and enable disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
 
 ---
