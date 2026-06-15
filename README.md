@@ -45,7 +45,6 @@ cmake --build build -j$(nproc)
 
 ```bash
 # Create Python environment
-uv venv
 uv sync
 
 # Configure with Python bindings enabled
@@ -86,7 +85,7 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
    sudo udevadm control --reload-rules
    sudo udevadm trigger
 
-   # Restart ADB and reconnect headset
+   # Restart ADB if running and reconnect headset
    adb kill-server
    adb start-server
    ```
@@ -115,7 +114,6 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
 | Element | Description |
 |---------|-------------|
 | **IP Address field** | IP address of the PC running this `trossen_vr` library |
-
 | **Start** | Connect to the robot PC |
 | **Stop** | Disconnect |
 | **Status** | Connection state: `Disconnected` → `Connecting` → `Connected` / `Degraded` |
@@ -131,7 +129,8 @@ Additional controller shortcuts:
 
 ### Configuring the IP Address
 
-Enter the IP address of the PC running the trossen_vr demo in the text field, then press Start button. The headset and PC must be on the same network.
+Enter the IP address of the PC running the trossen_vr application or demo in the text field, then press Start button.
+The headset and PC must be on the same network.
 
 ### Ways of Operating
 
@@ -148,8 +147,6 @@ Remove the headset and place it somewhere with a clear view of the controllers �
 > **Note on the proximity sensor:** Meta does not currently provide a built-in option to disable the proximity sensor from within the app — the headset will go to sleep immediately when removed. We will update the app once Meta adds support for this. In the meantime, two workarounds are available:
 >
 > - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
-
-> - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and enable disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
 
 ---
 
@@ -187,7 +184,6 @@ Located in `demos/python/`:
 - **`manual_polling_teleop.py`**: Python version of manual polling demo with direct frame access.
 
 ```bash
-source .venv/bin/activate
-python demos/python/event_driven_teleop.py
-python demos/python/manual_polling_teleop.py
+uv run demos/python/event_driven_teleop.py
+uv run demos/python/manual_polling_teleop.py
 ```
