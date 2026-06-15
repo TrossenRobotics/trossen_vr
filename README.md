@@ -113,23 +113,23 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
 
 | Element | Description |
 |---------|-------------|
-| **IP Address field** | IP address of the PC running this `trossen_vr` library |
-| **Start** | Connect to the robot PC |
-| **Stop** | Disconnect |
-| **Status** | Connection state: `Disconnected` → `Connecting` → `Connected` / `Degraded` |
-| **Frequency** | Data receive rate in Hz |
+| **Robot PC Address field** | IP address of the PC running this `trossen_vr` library |
+| **Connect** | Connect to the robot PC and start streaming arm data |
+| **Disconnect** | Stop streaming (robot arm holds its last position) |
+| **Status** | Live connection state: `Disconnected` → `Connecting` → `Connected` / `Degraded` |
+| **Frequency** | Data receive rate in Hz (shown once connected) |
 | **Passthrough** | Toggle camera passthrough view |
 | **Quit** | Exit the application |
 
-Additional controller shortcuts:
+Controller shortcuts:
 
 - **Left Menu Button**: Show or hide the UI panel
-- **Right Meta Button**: Reset the UI panel position to its default location
+- **Right Meta Button**: Snap the UI panel to in front of your current view
 - **Grip / Hand Trigger (deadman switch)**: Hold to enable tracking and engage the arm. Release to pause.
 
 ### Configuring the IP Address
 
-Enter the IP address of the PC running the trossen_vr application or demo in the text field, then press Start button.
+Enter the IP address of the PC running the trossen_vr application or demo in the **Robot PC IP Address** field, then press **Connect**.
 The headset and PC must be on the same network.
 
 ### Ways of Operating
