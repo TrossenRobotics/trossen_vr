@@ -105,11 +105,12 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
    ```
    A `Success` message confirms the installation completed.
 
-> **Note:** The app will appear in the headset's App Library. If it is not visible, switch the library filter to Unknown Sources.
+> [!NOTE]
+> The app will appear in the headset's App Library. If it is not visible, switch the library filter to Unknown Sources.
 
 ### App UI
 
-![VR Teleop App UI](assets/VR_Teleop_UI.jpg)
+![VR Teleop App UI](assets/VR_Teleop_ui.jpg)
 
 | Element | Description |
 |---------|-------------|
@@ -144,7 +145,8 @@ Press the Passthrough button in the UI to enable the headset's cameras so you ca
 
 Remove the headset and place it somewhere with a clear view of the controllers — overhead is recommended. This lets you observe the robot directly without a screen.
 
-> **Note on the proximity sensor:** Meta does not currently provide a built-in option to disable the proximity sensor from within the app — the headset will go to sleep immediately when removed. We will update the app once Meta adds support for this. In the meantime, two workarounds are available:
+> [!WARNING]
+> **Proximity sensor limitation:** Meta does not currently provide a built-in option to disable the proximity sensor from within the app — the headset will go to sleep immediately when removed. We will update the app once Meta adds support for this. In the meantime, two workarounds are available:
 >
 > - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
 
@@ -152,8 +154,10 @@ Remove the headset and place it somewhere with a clear view of the controllers �
 
 ## Demos
 
-> **Before running any demo**, start the Trossen VR Teleop app on your Meta Quest headset, enter the IP address of the PC, and press Start Button. The headset and PC must be on the same network.
+> [!IMPORTANT]
+> **Before running any demo**, start the Trossen VR Teleop app on your Meta Quest headset, enter the IP address of the PC, and press Connect Button. The headset and PC must be on the same network.
 
+> [!TIP]
 > **Update the robot IP addresses** in the demo source files to match your setup. The defaults are `192.168.1.4` (right arm) and `192.168.1.5` (left arm).
 
 ### Controls
