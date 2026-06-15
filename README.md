@@ -109,7 +109,7 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
 
 ### App UI
 
-![VR Teleop App UI](assets/VR_Teleop_ui.jpg)
+![VR Teleop App UI](assets/VR_Teleop_UI.jpg)
 
 | Element | Description |
 |---------|-------------|
