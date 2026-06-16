@@ -22,6 +22,13 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Follow the [libtrossen_arm C++ installation guide](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html#c) to install the robot driver if you want to run the demos.
 
+### Clone Repository
+
+```bash
+git clone https://github.com/TrossenRobotics/trossen_vr.git
+cd trossen_vr
+```
+
 ### Build C++ Library
 
 ```bash
@@ -149,6 +156,7 @@ Remove the headset and place it somewhere with a clear view of the controllers �
 > **Proximity sensor limitation:** Meta does not currently provide a built-in option to disable the proximity sensor from within the app — the headset will go to sleep immediately when removed. We will update the app once Meta adds support for this. In the meantime, two workarounds are available:
 >
 > - **Meta Quest Developer Hub — Windows only (up to 8 hours)**: Connect the headset to your PC via USB, open [Meta Quest Developer Hub](https://developers.meta.com/horizon/downloads/package/oculus-developer-hub-win/), and disable the proximity sensor under Device Manager > Device actions. This keeps the display on for up to 8 hours.
+> - **White tape method**: Cover the proximity sensor (located inside the headset near the nose bridge) with a small piece of white tape to trick the sensor into thinking the headset is worn.
 
 ---
 
