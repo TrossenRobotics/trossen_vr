@@ -156,7 +156,7 @@ Enter the IP address of the PC running the trossen_vr application or demo in the
 The headset and PC must be on the same network.
 
 > [!NOTE]
-> If the headset can't connect, allow the data port through the PC's firewall:
+> If the headset can't connect, allow the receiver UDP port through the PC's firewall (default: `9000/udp`; update this if you changed `ReceiverConfig.port`):
 > ```bash
 > sudo ufw allow 9000/udp
 > ```
