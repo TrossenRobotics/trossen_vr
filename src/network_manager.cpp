@@ -183,21 +183,20 @@ void NetworkManager::run() {
             if (total_messages_received_ == 0) {
                 freq_window_start_ = now;
                 freq_window_count_ = 1;
-            } else {
-                double window_duration = std::chrono::duration<double>(now - freq_window_start_).count();
+            }
+            else {
+                freq_window_count_++;
+            }
 
-                // Reset window every second
-                if (window_duration >= 1.0) {
-                    message_frequency_hz_ = (freq_window_count_ + 1) / window_duration;
-                    freq_window_start_ = now;
-                    freq_window_count_ = 1;
-                } else {
-                    // Update frequency continuously
-                    freq_window_count_++;
-                    if (window_duration > 0.0) {
-                        message_frequency_hz_ = freq_window_count_ / window_duration;
-                    }
-                }
+            total_messages_received_++;
+
+            double window_duration = std::chrono::duration<double>(now - freq_window_start_).count();
+
+            // Reset window every second
+            if (window_duration >= 1.0) {
+                message_frequency_hz_ = (freq_window_count_) / window_duration;
+                freq_window_start_ = now;
+                freq_window_count_ = 0;
             }
 
             last_received_time_ = now;
