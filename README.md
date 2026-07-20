@@ -2,6 +2,15 @@
 
 C++ and Python SDK for controlling Trossen robot arms using Meta Quest VR controllers over network communication.
 
+This package provides a complete solution for VR-based robot teleoperation, including:
+
+- C++ library with network communication and VR data handling
+- Python bindings for easy integration with Python workflows
+- Meta Quest VR headset application for wireless control
+- Event-driven and manual polling control patterns
+- Dual-arm support with independent deadman switches
+- Real-time pose and gripper control
+
 ## Requirements
 
 - [nlohmann/json](https://github.com/nlohmann/json) >= 3.2
@@ -49,6 +58,12 @@ cmake --build build -j$(nproc)
 ```
 
 ### Build Python Bindings (Optional)
+
+Install the Python development headers required by CMake's Python detection:
+
+```bash
+sudo apt install -y python3-dev
+```
 
 ```bash
 # Create Python environment
@@ -121,7 +136,7 @@ The Trossen VR Teleop app (`assets/VR_Teleop.apk`) can be sideloaded onto a Meta
 
 | Element | Description |
 |---------|-------------|
-| **Robot PC Address field** | IP address of the PC running this `trossen_vr` library |
+| **Robot PC IP Address field** | IP address of the PC running this `trossen_vr` library |
 | **Connect** | Connect to the robot PC and start streaming arm data |
 | **Disconnect** | Stop streaming (robot arm holds its last position) |
 | **Status** | Live connection state: `Disconnected` → `Connecting` → `Connected` / `Degraded` |
@@ -139,6 +154,12 @@ Controller shortcuts:
 
 Enter the IP address of the PC running the trossen_vr application or demo in the **Robot PC IP Address** field, then press **Connect**.
 The headset and PC must be on the same network.
+
+> [!NOTE]
+> If the headset can't connect, allow the receiver UDP port through the PC's firewall (default: `9000/udp`; update this if you changed `ReceiverConfig.port`):
+> ```bash
+> sudo ufw allow 9000/udp
+> ```
 
 ### Ways of Operating
 
