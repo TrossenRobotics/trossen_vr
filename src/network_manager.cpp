@@ -179,7 +179,7 @@ void NetworkManager::run() {
             std::lock_guard<std::mutex> lock(status_mutex_);
             auto now = std::chrono::steady_clock::now();
 
-            // Calculate frequency over 1-second rolling window
+            // Calculate frequency using a fixed 1-second window that resets once elapsed
             if (total_messages_received_ == 0) {
                 freq_window_start_ = now;
                 freq_window_count_ = 1;
@@ -200,7 +200,6 @@ void NetworkManager::run() {
             }
 
             last_received_time_ = now;
-            total_messages_received_++;
         }
 
         try {
