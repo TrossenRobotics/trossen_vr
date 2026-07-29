@@ -189,6 +189,10 @@ Remove the headset and place it somewhere with a clear view of the controllers â
 > [!TIP]
 > **Update the robot IP addresses** in the demo source files to match your setup. The defaults are `192.168.1.4` (right arm) and `192.168.1.5` (left arm).
 
+### Arm Models
+
+All demos accept `--model-left` and `--model-right` to select the arm model used when configuring each driver. Supported values are `wxai_v0` (default) and `pro`.
+
 ### Controls
 
 - **Hand/Grip Trigger**: Hold to enable tracking and engage arm (deadman switch). Release to pause.
@@ -205,8 +209,8 @@ Located in `demos/cpp/`:
 - **`manual_polling_teleop`**: Manual frame polling with inline state tracking. Same functionality, different implementation pattern showing direct frame access.
 
 ```bash
-./build/event_driven_teleop
-./build/manual_polling_teleop
+./build/event_driven_teleop --model-left pro --model-right pro
+./build/manual_polling_teleop --model-left wxai_v0 --model-right wxai_v0
 ```
 
 ### Python Demos
@@ -217,6 +221,6 @@ Located in `demos/python/`:
 - **`manual_polling_teleop.py`**: Python version of manual polling demo with direct frame access.
 
 ```bash
-uv run demos/python/event_driven_teleop.py
-uv run demos/python/manual_polling_teleop.py
+uv run demos/python/event_driven_teleop.py --model-left pro --model-right pro
+uv run demos/python/manual_polling_teleop.py --model-left wxai_v0 --model-right wxai_v0
 ```

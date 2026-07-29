@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "libtrossen_arm/trossen_arm.hpp"
@@ -17,9 +18,57 @@ void signal_handler(int) {
     running = 0;
 }
 
+struct ArmModelConfig {
+    trossen_arm::Model model;
+    trossen_arm::EndEffector end_effector;
+};
+
+// Supported arm models and their matching end effector
+const std::unordered_map<std::string, ArmModelConfig> kModelConfigs = {
+    {"wxai_v0", {trossen_arm::Model::wxai_v0, trossen_arm::StandardEndEffector::wxai_v0_follower}},
+    {"pro", {trossen_arm::Model::pro, trossen_arm::StandardEndEffector::pro_base}},
+};
+
+bool parse_model_arg(const std::string& value, ArmModelConfig& config) {
+    auto it = kModelConfigs.find(value);
+    if (it == kModelConfigs.end()) {
+        return false;
+    }
+    config = it->second;
+    return true;
+}
+
 int main(int argc, char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
+
+    // Parse --model-left / --model-right (wxai_v0 or pro)
+    std::string model_left_arg = "wxai_v0";
+    std::string model_right_arg = "wxai_v0";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--model-left" && i + 1 < argc) {
+            model_left_arg = argv[++i];
+        } else if (arg == "--model-right" && i + 1 < argc) {
+            model_right_arg = argv[++i];
+        } else if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0]
+                      << " [--model-left wxai_v0|pro] [--model-right wxai_v0|pro]" << std::endl;
+            return 0;
+        }
+    }
+
+    ArmModelConfig left_arm_config, right_arm_config;
+    if (!parse_model_arg(model_left_arg, left_arm_config)) {
+        std::cerr << "Unknown model '" << model_left_arg << "' for --model-left. "
+                  << "Valid options: wxai_v0, pro" << std::endl;
+        return 1;
+    }
+    if (!parse_model_arg(model_right_arg, right_arm_config)) {
+        std::cerr << "Unknown model '" << model_right_arg << "' for --model-right. "
+                  << "Valid options: wxai_v0, pro" << std::endl;
+        return 1;
+    }
 
     // Configuration
     const std::string right_arm_ip = "192.168.1.4";
@@ -39,15 +88,15 @@ int main(int argc, char** argv) {
     trossen_arm::TrossenArmDriver left_driver;
 
     right_driver.configure(
-        trossen_arm::Model::wxai_v0,
-        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        right_arm_config.model,
+        right_arm_config.end_effector,
         right_arm_ip, false
     );
     right_driver.set_all_modes(trossen_arm::Mode::position);
 
     left_driver.configure(
-        trossen_arm::Model::wxai_v0,
-        trossen_arm::StandardEndEffector::wxai_v0_leader,
+        left_arm_config.model,
+        left_arm_config.end_effector,
         left_arm_ip, false
     );
     left_driver.set_all_modes(trossen_arm::Mode::position);

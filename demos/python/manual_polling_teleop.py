@@ -1,3 +1,4 @@
+import argparse
 import signal
 import time
 
@@ -7,6 +8,33 @@ import trossen_vr as vr
 
 START_POSE = [0, np.pi / 3, np.pi / 6, np.pi / 5, 0, 0]
 IDLE_POSE = [0, 0, 0, 0, 0, 0]
+
+# Supported arm models and their matching end effector
+MODEL_CONFIGS = {
+    "wxai_v0": (
+        trossen_arm.Model.wxai_v0,
+        trossen_arm.StandardEndEffector.wxai_v0_follower,
+    ),
+    "pro": (trossen_arm.Model.pro, trossen_arm.StandardEndEffector.pro_base),
+}
+
+parser = argparse.ArgumentParser(description="Manual-polling dual-arm VR teleop demo")
+parser.add_argument(
+    "--model-left",
+    choices=MODEL_CONFIGS.keys(),
+    default="wxai_v0",
+    help="Arm model for the left arm (default: wxai_v0)",
+)
+parser.add_argument(
+    "--model-right",
+    choices=MODEL_CONFIGS.keys(),
+    default="wxai_v0",
+    help="Arm model for the right arm (default: wxai_v0)",
+)
+args = parser.parse_args()
+
+left_model, left_end_effector = MODEL_CONFIGS[args.model_left]
+right_model, right_end_effector = MODEL_CONFIGS[args.model_right]
 
 running = True
 
@@ -29,8 +57,8 @@ CMD_GOAL_TIME = 0.15
 # Robot setup
 right_driver = trossen_arm.TrossenArmDriver()
 right_driver.configure(
-    trossen_arm.Model.wxai_v0,
-    trossen_arm.StandardEndEffector.wxai_v0_leader,
+    right_model,
+    right_end_effector,
     RIGHT_ARM_IP,
     False,
 )
@@ -38,8 +66,8 @@ right_driver.set_all_modes(trossen_arm.Mode.position)
 
 left_driver = trossen_arm.TrossenArmDriver()
 left_driver.configure(
-    trossen_arm.Model.wxai_v0,
-    trossen_arm.StandardEndEffector.wxai_v0_leader,
+    left_model,
+    left_end_effector,
     LEFT_ARM_IP,
     False,
 )
