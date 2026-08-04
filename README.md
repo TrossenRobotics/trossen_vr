@@ -193,9 +193,21 @@ Remove the headset and place it somewhere with a clear view of the controllers �
 
 - **Hand/Grip Trigger**: Hold to enable tracking and engage arm (deadman switch). Release to pause.
 - **Index Trigger**: Control gripper open/close.
+- **A Button** (right controller): Recover from a fault (e.g. a joint limit) on either arm.
 - **B Button** (right controller): Exit program.
 
 Tracking and engagement happen automatically when you hold the hand trigger. Release the trigger to pause control while keeping the program running.
+
+All 4 demos widen each arm's velocity/effort fault *tolerance* to its max on
+startup, so ordinary teleop motion doesn't spuriously trip a fault. If an
+arm still faults (e.g. a real position limit), that arm stops being
+commanded — it doesn't crash the demo — and the console prints which arm
+faulted. Press **A** to clear the fault: the arm moves back to its home
+(start) pose first, then re-captures its controller offset instead of
+resuming from the stale one, so it neither jumps nor snaps back — it just
+starts fresh from home. If you don't recover before exiting, the
+idle-position move at shutdown is skipped for that arm (also non-fatal —
+logged, not crashed).
 
 ### C++ Demos
 

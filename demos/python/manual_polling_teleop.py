@@ -24,7 +24,20 @@ RIGHT_ARM_IP = "192.168.1.4"
 LEFT_ARM_IP = "192.168.1.5"
 SEND_RATE_HZ = 100.0
 GRIPPER_MAX_M = 0.04
-CMD_GOAL_TIME = 0.15
+CMD_GOAL_TIME = 0.20
+
+
+def relax_velocity_effort_limits(driver):
+    """Widen the arm joints' velocity/effort fault *tolerance* to their max so normal
+    teleop motion doesn't spuriously trip a fault. Genuine faults (e.g. a real position
+    limit) still trip and are handled via right_faulted/left_faulted rather than crashing.
+    """
+    limits = driver.get_joint_limits()
+    for i in range(6):
+        limits[i].velocity_tolerance = limits[i].velocity_max
+        limits[i].effort_tolerance = limits[i].effort_max
+    driver.set_joint_limits(limits)
+
 
 # Robot setup
 right_driver = trossen_arm.TrossenArmDriver()
@@ -34,6 +47,7 @@ right_driver.configure(
     RIGHT_ARM_IP,
     False,
 )
+relax_velocity_effort_limits(right_driver)
 right_driver.set_all_modes(trossen_arm.Mode.position)
 
 left_driver = trossen_arm.TrossenArmDriver()
@@ -43,6 +57,7 @@ left_driver.configure(
     LEFT_ARM_IP,
     False,
 )
+relax_velocity_effort_limits(left_driver)
 left_driver.set_all_modes(trossen_arm.Mode.position)
 
 print("Moving arms to start position")
@@ -66,9 +81,16 @@ prev_left_tracked = 0
 
 # Button state tracking for edge detection
 prev_button_b = 0
+prev_button_a = 0
+
+# Set when a driver call raises (e.g. a joint limit). While True, that arm is
+# skipped entirely until recovered (button A).
+right_faulted = False
+left_faulted = False
 
 print(
-    "Waiting for VR data... Hand/Grip trigger to engage, release to pause. Press B to exit"
+    "Waiting for VR data... Hand/Grip trigger to engage, release to pause. "
+    "Press A to recover from a fault, B to exit"
 )
 
 send_period = 1.0 / SEND_RATE_HZ
@@ -103,6 +125,35 @@ while running:
         break
     prev_button_b = button_b_current
 
+    # Button A - recover either/both arms from a fault (rising edge detection)
+    button_a_current = frame.right_controller.buttons.one
+    if button_a_current and not prev_button_a:
+        if not right_faulted and not left_faulted:
+            print("A pressed, but no arm is faulted")
+        if right_faulted:
+            try:
+                right_driver.clear_error()
+                right_driver.set_all_modes(trossen_arm.Mode.position)
+                print("Right arm: moving to home before resuming teleop")
+                right_driver.set_arm_positions(START_POSE, 2.0, True)
+                right_faulted = False
+                offset_captured = False  # re-capture instead of jumping
+                print("Right arm: fault cleared")
+            except Exception as e:
+                print(f"Right arm: clear_error failed, still faulted: {e}")
+        if left_faulted:
+            try:
+                left_driver.clear_error()
+                left_driver.set_all_modes(trossen_arm.Mode.position)
+                print("Left arm: moving to home before resuming teleop")
+                left_driver.set_arm_positions(START_POSE, 2.0, True)
+                left_faulted = False
+                offset_captured = False  # re-capture instead of jumping
+                print("Left arm: fault cleared")
+            except Exception as e:
+                print(f"Left arm: clear_error failed, still faulted: {e}")
+    prev_button_a = button_a_current
+
     # Tracking state
     right_tracked = frame.right_controller.is_tracked != 0
     left_tracked = frame.left_controller.is_tracked != 0
@@ -125,50 +176,70 @@ while running:
     prev_left_tracked = left_tracked
 
     # Update grippers
-    right_driver.set_gripper_position(
-        frame.right_controller.triggers.index_trigger * GRIPPER_MAX_M, 0.0, False
-    )
-    left_driver.set_gripper_position(
-        frame.left_controller.triggers.index_trigger * GRIPPER_MAX_M, 0.0, False
-    )
+    if not right_faulted:
+        try:
+            right_driver.set_gripper_position(
+                frame.right_controller.triggers.index_trigger * GRIPPER_MAX_M,
+                0.0,
+                False,
+            )
+        except Exception as e:
+            print(f"Right arm: FAULT, press A to recover: {e}")
+            right_faulted = True
+    if not left_faulted:
+        try:
+            left_driver.set_gripper_position(
+                frame.left_controller.triggers.index_trigger * GRIPPER_MAX_M, 0.0, False
+            )
+        except Exception as e:
+            print(f"Left arm: FAULT, press A to recover: {e}")
+            left_faulted = True
 
     # Capture offset on first valid frame after engage
     if not offset_captured and (right_tracked or left_tracked):
-        if right_tracked:
-            rp = right_driver.get_cartesian_positions()
-            robot_pose_right = vr.Pose6D()
-            robot_pose_right.x, robot_pose_right.y, robot_pose_right.z = (
-                rp[0],
-                rp[1],
-                rp[2],
-            )
-            robot_pose_right.ax, robot_pose_right.ay, robot_pose_right.az = (
-                rp[3],
-                rp[4],
-                rp[5],
-            )
+        if right_tracked and not right_faulted:
+            try:
+                rp = right_driver.get_cartesian_positions()
+                robot_pose_right = vr.Pose6D()
+                robot_pose_right.x, robot_pose_right.y, robot_pose_right.z = (
+                    rp[0],
+                    rp[1],
+                    rp[2],
+                )
+                robot_pose_right.ax, robot_pose_right.ay, robot_pose_right.az = (
+                    rp[3],
+                    rp[4],
+                    rp[5],
+                )
 
-            T_robot_right = vr.pose6d_to_transform4d(robot_pose_right)
-            T_vr_right = vr.pose6d_to_transform4d(frame.right_controller.pose6d)
-            T_offset_right = T_robot_right * T_vr_right.inverse()
+                T_robot_right = vr.pose6d_to_transform4d(robot_pose_right)
+                T_vr_right = vr.pose6d_to_transform4d(frame.right_controller.pose6d)
+                T_offset_right = T_robot_right * T_vr_right.inverse()
+            except Exception as e:
+                print(f"Right arm: FAULT, press A to recover: {e}")
+                right_faulted = True
 
-        if left_tracked:
-            lp = left_driver.get_cartesian_positions()
-            robot_pose_left = vr.Pose6D()
-            robot_pose_left.x, robot_pose_left.y, robot_pose_left.z = (
-                lp[0],
-                lp[1],
-                lp[2],
-            )
-            robot_pose_left.ax, robot_pose_left.ay, robot_pose_left.az = (
-                lp[3],
-                lp[4],
-                lp[5],
-            )
+        if left_tracked and not left_faulted:
+            try:
+                lp = left_driver.get_cartesian_positions()
+                robot_pose_left = vr.Pose6D()
+                robot_pose_left.x, robot_pose_left.y, robot_pose_left.z = (
+                    lp[0],
+                    lp[1],
+                    lp[2],
+                )
+                robot_pose_left.ax, robot_pose_left.ay, robot_pose_left.az = (
+                    lp[3],
+                    lp[4],
+                    lp[5],
+                )
 
-            T_robot_left = vr.pose6d_to_transform4d(robot_pose_left)
-            T_vr_left = vr.pose6d_to_transform4d(frame.left_controller.pose6d)
-            T_offset_left = T_robot_left * T_vr_left.inverse()
+                T_robot_left = vr.pose6d_to_transform4d(robot_pose_left)
+                T_vr_left = vr.pose6d_to_transform4d(frame.left_controller.pose6d)
+                T_offset_left = T_robot_left * T_vr_left.inverse()
+            except Exception as e:
+                print(f"Left arm: FAULT, press A to recover: {e}")
+                left_faulted = True
 
         offset_captured = True
         continue
@@ -183,46 +254,60 @@ while running:
     last_send = now
 
     # Send commands only when controllers are tracked
-    if offset_captured and right_tracked:
-        T_vr_right = vr.pose6d_to_transform4d(frame.right_controller.pose6d)
-        T_cmd_right = T_offset_right * T_vr_right
-        cmd_right = vr.transform4d_to_pose6d(T_cmd_right)
-        goal = [
-            cmd_right.x,
-            cmd_right.y,
-            cmd_right.z,
-            cmd_right.ax,
-            cmd_right.ay,
-            cmd_right.az,
-        ]
-        right_driver.set_cartesian_positions(
-            goal,
-            trossen_arm.InterpolationSpace.cartesian,
-            CMD_GOAL_TIME,
-            False,
-        )
+    if offset_captured and right_tracked and not right_faulted:
+        try:
+            T_vr_right = vr.pose6d_to_transform4d(frame.right_controller.pose6d)
+            T_cmd_right = T_offset_right * T_vr_right
+            cmd_right = vr.transform4d_to_pose6d(T_cmd_right)
+            goal = [
+                cmd_right.x,
+                cmd_right.y,
+                cmd_right.z,
+                cmd_right.ax,
+                cmd_right.ay,
+                cmd_right.az,
+            ]
+            right_driver.set_cartesian_positions(
+                goal,
+                trossen_arm.InterpolationSpace.cartesian,
+                CMD_GOAL_TIME,
+                False,
+            )
+        except Exception as e:
+            print(f"Right arm: FAULT, press A to recover: {e}")
+            right_faulted = True
 
-    if offset_captured and left_tracked:
-        T_vr_left = vr.pose6d_to_transform4d(frame.left_controller.pose6d)
-        T_cmd_left = T_offset_left * T_vr_left
-        cmd_left = vr.transform4d_to_pose6d(T_cmd_left)
-        goal = [
-            cmd_left.x,
-            cmd_left.y,
-            cmd_left.z,
-            cmd_left.ax,
-            cmd_left.ay,
-            cmd_left.az,
-        ]
-        left_driver.set_cartesian_positions(
-            goal,
-            trossen_arm.InterpolationSpace.cartesian,
-            CMD_GOAL_TIME,
-            False,
-        )
+    if offset_captured and left_tracked and not left_faulted:
+        try:
+            T_vr_left = vr.pose6d_to_transform4d(frame.left_controller.pose6d)
+            T_cmd_left = T_offset_left * T_vr_left
+            cmd_left = vr.transform4d_to_pose6d(T_cmd_left)
+            goal = [
+                cmd_left.x,
+                cmd_left.y,
+                cmd_left.z,
+                cmd_left.ax,
+                cmd_left.ay,
+                cmd_left.az,
+            ]
+            left_driver.set_cartesian_positions(
+                goal,
+                trossen_arm.InterpolationSpace.cartesian,
+                CMD_GOAL_TIME,
+                False,
+            )
+        except Exception as e:
+            print(f"Left arm: FAULT, press A to recover: {e}")
+            left_faulted = True
 
 receiver.stop()
 print("\nShutting down...")
 print("Moving arms to idle position")
-right_driver.set_arm_positions(IDLE_POSE, 2.0, True)
-left_driver.set_arm_positions(IDLE_POSE, 2.0, True)
+try:
+    right_driver.set_arm_positions(IDLE_POSE, 2.0, True)
+except Exception as e:
+    print(f"Right arm: could not move to idle (still faulted?): {e}")
+try:
+    left_driver.set_arm_positions(IDLE_POSE, 2.0, True)
+except Exception as e:
+    print(f"Left arm: could not move to idle (still faulted?): {e}")

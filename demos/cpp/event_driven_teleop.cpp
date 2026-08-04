@@ -22,20 +22,41 @@ struct ArmTeleopState {
     trossen_vr::Transform4D T_offset;
     trossen_vr::Pose6D last_vr_pose;
     bool pose_valid = false;
+    // Set when a driver call throws (e.g. a joint limit). While true, this
+    // arm is skipped entirely until recovered (button A - see main()).
+    bool faulted = false;
 };
 
-void engage_arm(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver) {
-    if (state.engaged || !state.pose_valid) return;
+// Widen the arm joints' velocity/effort fault *tolerance* to their max so
+// normal teleop motion doesn't spuriously trip a fault; genuine faults
+// (e.g. a real position limit) still trip and are handled via `faulted`
+// above rather than crashing the process.
+void relax_velocity_effort_limits(trossen_arm::TrossenArmDriver& driver) {
+    auto limits = driver.get_joint_limits();
+    for (std::size_t i = 0; i < 6; ++i) {
+        limits[i].velocity_tolerance = limits[i].velocity_max;
+        limits[i].effort_tolerance = limits[i].effort_max;
+    }
+    driver.set_joint_limits(limits);
+}
 
-    auto current_p = driver.get_cartesian_positions();
-    trossen_vr::Pose6D robot_pose;
-    robot_pose.x = current_p[0]; robot_pose.y = current_p[1]; robot_pose.z = current_p[2];
-    robot_pose.ax = current_p[3]; robot_pose.ay = current_p[4]; robot_pose.az = current_p[5];
+void engage_arm(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver, const char* label) {
+    if (state.faulted || state.engaged || !state.pose_valid) return;
 
-    trossen_vr::Transform4D T_robot = trossen_vr::pose6d_to_transform4d(robot_pose);
-    trossen_vr::Transform4D T_vr = trossen_vr::pose6d_to_transform4d(state.last_vr_pose);
-    state.T_offset = T_robot * T_vr.inverse();
-    state.engaged = true;
+    try {
+        auto current_p = driver.get_cartesian_positions();
+        trossen_vr::Pose6D robot_pose;
+        robot_pose.x = current_p[0]; robot_pose.y = current_p[1]; robot_pose.z = current_p[2];
+        robot_pose.ax = current_p[3]; robot_pose.ay = current_p[4]; robot_pose.az = current_p[5];
+
+        trossen_vr::Transform4D T_robot = trossen_vr::pose6d_to_transform4d(robot_pose);
+        trossen_vr::Transform4D T_vr = trossen_vr::pose6d_to_transform4d(state.last_vr_pose);
+        state.T_offset = T_robot * T_vr.inverse();
+        state.engaged = true;
+    } catch (const std::exception& e) {
+        std::cout << label << ": FAULT, press A to recover: " << e.what() << std::endl;
+        state.faulted = true;
+    }
 }
 
 void disengage_arm(ArmTeleopState& state) {
@@ -45,18 +66,47 @@ void disengage_arm(ArmTeleopState& state) {
 }
 
 void send_arm_command(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver,
-                      double cmd_goal_time) {
-    if (!state.engaged || !state.pose_valid) return;
+                      double cmd_goal_time, const char* label) {
+    if (state.faulted || !state.engaged || !state.pose_valid) return;
 
-    trossen_vr::Transform4D T_vr = trossen_vr::pose6d_to_transform4d(state.last_vr_pose);
-    trossen_vr::Transform4D T_cmd = state.T_offset * T_vr;
-    trossen_vr::Pose6D cmd_pose = trossen_vr::transform4d_to_pose6d(T_cmd);
-    std::array<double, 6> goal{cmd_pose.x, cmd_pose.y, cmd_pose.z,
-                              cmd_pose.ax, cmd_pose.ay, cmd_pose.az};
-    driver.set_cartesian_positions(
-        goal, trossen_arm::InterpolationSpace::cartesian,
-        cmd_goal_time, false
-    );
+    try {
+        trossen_vr::Transform4D T_vr = trossen_vr::pose6d_to_transform4d(state.last_vr_pose);
+        trossen_vr::Transform4D T_cmd = state.T_offset * T_vr;
+        trossen_vr::Pose6D cmd_pose = trossen_vr::transform4d_to_pose6d(T_cmd);
+        std::array<double, 6> goal{cmd_pose.x, cmd_pose.y, cmd_pose.z,
+                                  cmd_pose.ax, cmd_pose.ay, cmd_pose.az};
+        driver.set_cartesian_positions(
+            goal, trossen_arm::InterpolationSpace::cartesian,
+            cmd_goal_time, false
+        );
+    } catch (const std::exception& e) {
+        std::cout << label << ": FAULT, press A to recover: " << e.what() << std::endl;
+        state.faulted = true;
+    }
+}
+
+// Attempt to clear a fault and prime the arm to resume smoothly. Returns
+// true if the arm is (now) not faulted -- a no-op success if it wasn't
+// faulted to begin with.
+bool try_recover(ArmTeleopState& state, trossen_arm::TrossenArmDriver& driver,
+                 const char* label, const std::vector<double>& home_pose) {
+    if (!state.faulted) return true;
+    try {
+        driver.clear_error();
+        driver.set_all_modes(trossen_arm::Mode::position);
+        std::cout << label << ": moving to home before resuming teleop" << std::endl;
+        driver.set_arm_positions(home_pose, 2.0, true);
+        state.faulted = false;
+        // Force a fresh offset capture instead of resuming from the stale
+        // one, so the arm ramps to the controller's current pose rather
+        // than jumping.
+        state.engaged = false;
+        std::cout << label << ": fault cleared, re-engage by moving the controller" << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        std::cout << label << ": clear_error failed, still faulted: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 int main(int argc, char** argv) {
@@ -85,6 +135,7 @@ int main(int argc, char** argv) {
         trossen_arm::StandardEndEffector::wxai_v0_leader,
         right_arm_ip, false
     );
+    relax_velocity_effort_limits(right_driver);
     right_driver.set_all_modes(trossen_arm::Mode::position);
 
     left_driver.configure(
@@ -92,6 +143,7 @@ int main(int argc, char** argv) {
         trossen_arm::StandardEndEffector::wxai_v0_leader,
         left_arm_ip, false
     );
+    relax_velocity_effort_limits(left_driver);
     left_driver.set_all_modes(trossen_arm::Mode::position);
 
     std::cout << "Moving arms to start position" << std::endl;
@@ -118,14 +170,36 @@ int main(int argc, char** argv) {
         running = false;
     });
 
+    // Button A (right controller) - recover either/both arms from a fault
+    teleop.on_button_a([&]() {
+        if (!right_state.faulted && !left_state.faulted) {
+            std::cout << "A pressed, but no arm is faulted" << std::endl;
+            return;
+        }
+        try_recover(right_state, right_driver, "Right arm", START_POSE);
+        try_recover(left_state, left_driver, "Left arm", START_POSE);
+    });
+
     // Right trigger - right gripper
     teleop.on_right_trigger([&](double val) {
-        right_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+        if (right_state.faulted) return;
+        try {
+            right_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+        } catch (const std::exception& e) {
+            std::cout << "Right arm: FAULT, press A to recover: " << e.what() << std::endl;
+            right_state.faulted = true;
+        }
     });
 
     // Left trigger - left gripper
     teleop.on_left_trigger([&](double val) {
-        left_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+        if (left_state.faulted) return;
+        try {
+            left_driver.set_gripper_position(val * gripper_max_m, 0.0, false);
+        } catch (const std::exception& e) {
+            std::cout << "Left arm: FAULT, press A to recover: " << e.what() << std::endl;
+            left_state.faulted = true;
+        }
     });
 
     // Right controller pose - auto engage/disengage based on tracking
@@ -135,7 +209,7 @@ int main(int argc, char** argv) {
 
         if (!prev_right_tracked) {
             // Auto-engage arm
-            engage_arm(right_state, right_driver);
+            engage_arm(right_state, right_driver, "Right arm");
             std::cout << "Right arm ENGAGED" << std::endl;
         }
         prev_right_tracked = 1;
@@ -148,7 +222,7 @@ int main(int argc, char** argv) {
 
         if (!prev_left_tracked) {
             // Auto-engage arm
-            engage_arm(left_state, left_driver);
+            engage_arm(left_state, left_driver, "Left arm");
             std::cout << "Left arm ENGAGED" << std::endl;
         }
         prev_left_tracked = 1;
@@ -159,7 +233,8 @@ int main(int argc, char** argv) {
     auto last_send_time = std::chrono::steady_clock::now();
     trossen_vr::ConnectionStatus last_status = trossen_vr::ConnectionStatus::Disconnected;
 
-    std::cout << "Waiting for VR data... Hand/Grip trigger to engage, release to pause. Press B to exit" << std::endl;
+    std::cout << "Waiting for VR data... Hand/Grip trigger to engage, release to pause. "
+                 "Press A to recover from a fault, B to exit" << std::endl;
 
     while (running) {
         // Monitor connection status
@@ -212,8 +287,8 @@ int main(int argc, char** argv) {
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_send_time;
         if (elapsed.count() >= send_period) {
-            send_arm_command(right_state, right_driver, cmd_goal_time);
-            send_arm_command(left_state, left_driver, cmd_goal_time);
+            send_arm_command(right_state, right_driver, cmd_goal_time, "Right arm");
+            send_arm_command(left_state, left_driver, cmd_goal_time, "Left arm");
             last_send_time = now;
         }
     }
@@ -222,8 +297,16 @@ int main(int argc, char** argv) {
     receiver.stop();
     std::cout << "\nShutting down..." << std::endl;
     std::cout << "Moving arms to idle position" << std::endl;
-    right_driver.set_arm_positions(IDLE_POSE, 2.0, true);
-    left_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+    try {
+        right_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+    } catch (const std::exception& e) {
+        std::cout << "Right arm: could not move to idle (still faulted?): " << e.what() << std::endl;
+    }
+    try {
+        left_driver.set_arm_positions(IDLE_POSE, 2.0, true);
+    } catch (const std::exception& e) {
+        std::cout << "Left arm: could not move to idle (still faulted?): " << e.what() << std::endl;
+    }
 
     return 0;
 }
